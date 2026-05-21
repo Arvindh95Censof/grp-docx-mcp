@@ -773,10 +773,10 @@ def get_footnotes(document_handle: str = "") -> str:
 
 
 @mcp.tool()
-def add_footnote(para_id: str, text: str, document_handle: str = "") -> str:
-    """Add a footnote to a paragraph."""
+def add_footnote(para_id: str, text: str, url: str = "", document_handle: str = "") -> str:
+    """Add a footnote to a paragraph. url, if provided, is rendered as a hotlink."""
     _, doc = _resolve(document_handle)
-    return _js(doc.add_footnote(para_id, text))
+    return _js(doc.add_footnote(para_id, text, url=url))
 
 
 @mcp.tool()

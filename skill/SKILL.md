@@ -212,7 +212,7 @@ Fitting: `chars × dxa_per_char ≤ column_width − 240` (240 = default cell ma
 | Tool | Purpose | Key args |
 |------|---------|----------|
 | `get_footnotes` | List all footnotes | — |
-| `add_footnote` | Footnote with superscript ref | `para_id`, `text` |
+| `add_footnote` | Footnote with superscript ref | `para_id`, `text`, `url` (optional hotlink) |
 | `validate_footnotes` | Cross-ref footnote IDs | — |
 | `get_endnotes` | List all endnotes | — |
 | `add_endnote` | Endnote with superscript ref | `para_id`, `text` |
@@ -421,9 +421,17 @@ When extracting text from paragraphs that contain footnote references, the super
 
 A document template's numbering definition often specifies its own indents. When inserting list content via `add_list()`, verify the rendered indent matches expectations — the template's `w:abstractNum` definition takes precedence. If indents look wrong, the fix requires editing the numbering XML directly (outside docx-mcp's current tool set) or applying explicit paragraph indent overrides.
 
-### Footnote URLs
+### Hotlinked URLs in Footnotes
 
-`add_footnote()` accepts plain text. To include a clickable URL in a footnote, insert the URL as plain text — it will be recognised as a hyperlink by modern Word and most readers. Full hyperlink markup (with relationship IDs) requires direct OOXML editing beyond the MCP tool set.
+Pass `url="https://..."` to `add_footnote()` to render the URL as a clickable hyperlink inside the footnote body:
+
+```
+add_footnote(para_id, "SWGDE Best Practices for Mobile Device Evidence Collection", url="https://www.swgde.org/documents")
+```
+
+- Label text is added as a plain run; the URL is appended as a `<w:hyperlink>` with `Hyperlink` character style and a relationship registered in `word/_rels/footnotes.xml.rels`.
+- Multiple footnotes with different URLs each get a distinct `rId`.
+- Omitting `url` produces plain-text footnotes (backward-compatible).
 
 ## Audit Checklist
 

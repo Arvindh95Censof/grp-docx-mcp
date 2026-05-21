@@ -2,9 +2,16 @@
 
 from __future__ import annotations
 
+import contextlib
 from lxml import etree
 
-from .base import W14, W, _preserve
+from .base import W14, W, RELS, _preserve
+
+_RELS_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
+_HYPERLINK_REL_TYPE = (
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink"
+)
+_R_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 
 
 class FootnotesMixin:
@@ -24,7 +31,44 @@ class FootnotesMixin:
             )
         return result
 
-    def add_footnote(self, para_id: str, text: str) -> dict:
+    def _get_or_create_footnotes_rels(self) -> etree._Element:
+        """Return the root of word/_rels/footnotes.xml.rels, creating it if absent."""
+        rels_path = "word/_rels/footnotes.xml.rels"
+        root = self._tree(rels_path)
+        if root is not None:
+            return root
+        root = etree.Element(
+            f"{{{_RELS_NS}}}Relationships",
+            nsmap={None: _RELS_NS},
+        )
+        self._trees[rels_path] = root
+        from pathlib import Path
+        fp = self.workdir / rels_path
+        fp.parent.mkdir(parents=True, exist_ok=True)
+        etree.ElementTree(root).write(
+            str(fp), xml_declaration=True, encoding="UTF-8", standalone=True
+        )
+        return root
+
+    def _add_external_hyperlink_rel(self, rels_path: str, url: str) -> str:
+        """Add an External hyperlink relationship for url; return its rId."""
+        root = self._get_or_create_footnotes_rels() if rels_path == "word/_rels/footnotes.xml.rels" else self._tree(rels_path)
+        max_rid = 0
+        for rel in root.findall(f"{{{_RELS_NS}}}Relationship"):
+            rid = rel.get("Id", "")
+            if rid.startswith("rId"):
+                with contextlib.suppress(ValueError):
+                    max_rid = max(max_rid, int(rid[3:]))
+        new_rid = f"rId{max_rid + 1}"
+        rel_el = etree.SubElement(root, f"{{{_RELS_NS}}}Relationship")
+        rel_el.set("Id", new_rid)
+        rel_el.set("Type", _HYPERLINK_REL_TYPE)
+        rel_el.set("Target", url)
+        rel_el.set("TargetMode", "External")
+        self._mark(rels_path)
+        return new_rid
+
+    def add_footnote(self, para_id: str, text: str, url: str = "") -> dict:
         """Add a footnote to a paragraph. Returns the new footnote ID."""
         doc = self._require("word/document.xml")
         fn_tree = self._require("word/footnotes.xml")
@@ -60,10 +104,27 @@ class FootnotesMixin:
         sp_t = etree.SubElement(sp_run, f"{W}t")
         _preserve(sp_t, " ")
 
-        # Text
-        txt_run = etree.SubElement(fn_para, f"{W}r")
-        txt_t = etree.SubElement(txt_run, f"{W}t")
-        _preserve(txt_t, text)
+        # Label text (if provided)
+        if text:
+            txt_run = etree.SubElement(fn_para, f"{W}r")
+            txt_t = etree.SubElement(txt_run, f"{W}t")
+            if url:
+                # Add trailing space before the hyperlink
+                _preserve(txt_t, text + " ")
+            else:
+                _preserve(txt_t, text)
+
+        # Hotlinked URL (if provided)
+        if url:
+            r_id = self._add_external_hyperlink_rel("word/_rels/footnotes.xml.rels", url)
+            hl = etree.SubElement(fn_para, f"{W}hyperlink")
+            hl.set(f"{{{_R_NS}}}id", r_id)
+            url_run = etree.SubElement(hl, f"{W}r")
+            url_rpr = etree.SubElement(url_run, f"{W}rPr")
+            url_rs = etree.SubElement(url_rpr, f"{W}rStyle")
+            url_rs.set(f"{W}val", "Hyperlink")
+            url_t = etree.SubElement(url_run, f"{W}t")
+            _preserve(url_t, url)
 
         self._mark("word/footnotes.xml")
 
@@ -89,7 +150,10 @@ class FootnotesMixin:
         fref.set(f"{W}id", str(next_id))
         self._mark("word/document.xml")
 
-        return {"footnote_id": next_id, "para_id": para_id}
+        result: dict = {"footnote_id": next_id, "para_id": para_id}
+        if url:
+            result["url"] = url
+        return result
 
     def update_footnote(self, footnote_id: int, text: str) -> dict:
         """Update the text of an existing footnote.

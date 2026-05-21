@@ -119,7 +119,7 @@ Supports: headings, bold/italic/strikethrough, links, images, bullet/numbered/ne
 | Tool | Purpose | Key args |
 |------|---------|----------|
 | `get_footnotes` | List all footnotes | — |
-| `add_footnote` | Footnote with superscript ref | `para_id`, `text` |
+| `add_footnote` | Footnote with superscript ref | `para_id`, `text`, `url` (optional hotlink) |
 | `validate_footnotes` | Cross-ref footnote IDs | — |
 | `get_endnotes` | List all endnotes | — |
 | `add_endnote` | Endnote with superscript ref | `para_id`, `text` |
@@ -311,6 +311,19 @@ When extracting text from paragraphs that contain footnote references, the super
 ### Multi-Source Citations Are Comma-Delimited
 
 Calling `add_footnote()` twice on the same paragraph produces comma-delimited superscripts (¹,²,³). `add_footnote()` automatically inserts a superscript comma run when the last run of the target paragraph is already a footnote reference — no extra steps needed.
+
+### Hotlinked URLs in Footnotes
+
+Pass `url="https://..."` to `add_footnote()` to render the URL as a clickable hyperlink inside the footnote body:
+
+```
+add_footnote(para_id, "SWGDE Best Practices for Mobile Device Evidence Collection", url="https://www.swgde.org/documents")
+```
+
+- The label text is added as a plain run; the URL is appended as a `<w:hyperlink>` with `Hyperlink` character style.
+- A relationship entry (`TargetMode="External"`) is automatically registered in `word/_rels/footnotes.xml.rels`.
+- Multiple footnotes with different URLs each get a distinct `rId`.
+- If `url` is omitted the behavior is unchanged (backward-compatible).
 
 ## Audit Checklist
 
