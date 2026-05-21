@@ -308,6 +308,10 @@ Markdown doesn't have real footnotes — `[^1]` syntax is a convention that some
 
 When extracting text from paragraphs that contain footnote references, the superscript reference numbers are invisible in the XML text but adjacent characters concatenate. Example: "File #8" followed by superscript footnote "73" extracts as "File #873". Account for this when using `search_text()` with regex patterns on footnoted text.
 
+### Multi-Source Citations Are Comma-Delimited
+
+Calling `add_footnote()` twice on the same paragraph produces comma-delimited superscripts (¹,²,³). `add_footnote()` automatically inserts a superscript comma run when the last run of the target paragraph is already a footnote reference — no extra steps needed.
+
 ## Audit Checklist
 
 Before delivering any edited document, run through this checklist:

@@ -74,6 +74,53 @@ class TestFootnoteCRUD:
         fn = next(f for f in footnotes if f["id"] == fid)
         assert "Revised text" in fn["text"]
 
+    def test_consecutive_footnotes_produce_comma_delimiter(self):
+        """Two add_footnote() calls on the same paragraph insert a superscript comma between refs."""
+        from lxml import etree
+
+        W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+        W14 = "http://schemas.microsoft.com/office/word/2010/wordml"
+
+        r1 = _j(server.add_footnote("00000004", "First source"))
+        r2 = _j(server.add_footnote("00000004", "Second source"))
+        id1, id2 = r1["footnote_id"], r2["footnote_id"]
+
+        # Inspect raw document XML via the server's internal document registry
+        doc_obj = server._docs[server._DEFAULT_HANDLE]
+        doc_tree = doc_obj._tree("word/document.xml")
+
+        # Find the paragraph by paraId
+        para = None
+        for p in doc_tree.iter(f"{{{W}}}p"):
+            if p.get(f"{{{W14}}}paraId") == "00000004":
+                para = p
+                break
+        assert para is not None, "Paragraph 00000004 not found"
+
+        # Collect the tail of children: [... fn_ref(id1), comma_run, fn_ref(id2)]
+        children = list(para)
+        fn_runs = [
+            c for c in children
+            if c.tag == f"{{{W}}}r" and c.find(f"{{{W}}}footnoteReference") is not None
+        ]
+        assert len(fn_runs) >= 2, "Expected at least two footnote reference runs"
+
+        # The runs for id1 and id2 should be separated by exactly one comma run
+        idx1 = children.index(fn_runs[-2])
+        idx2 = children.index(fn_runs[-1])
+        assert idx2 == idx1 + 2, "Comma run should sit between the two consecutive fn ref runs"
+
+        between = children[idx1 + 1]
+        assert between.tag == f"{{{W}}}r"
+        t_el = between.find(f"{{{W}}}t")
+        assert t_el is not None and t_el.text == ",", "Separator run must contain a single comma"
+
+        # Confirm the footnote ref IDs are correct
+        ref1 = fn_runs[-2].find(f"{{{W}}}footnoteReference").get(f"{{{W}}}id")
+        ref2 = fn_runs[-1].find(f"{{{W}}}footnoteReference").get(f"{{{W}}}id")
+        assert ref1 == str(id1)
+        assert ref2 == str(id2)
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  TestEndnoteCRUD

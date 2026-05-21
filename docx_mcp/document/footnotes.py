@@ -67,7 +67,20 @@ class FootnotesMixin:
 
         self._mark("word/footnotes.xml")
 
-        # Add reference in document paragraph
+        # Add reference in document paragraph.
+        # If the last run already carries a footnoteReference, insert a
+        # superscript comma so consecutive refs render as ¹,² not ¹².
+        last_run = next(
+            (c for c in reversed(list(para)) if c.tag == f"{W}r"), None
+        )
+        if last_run is not None and last_run.find(f"{W}footnoteReference") is not None:
+            comma_r = etree.SubElement(para, f"{W}r")
+            comma_rpr = etree.SubElement(comma_r, f"{W}rPr")
+            comma_rs = etree.SubElement(comma_rpr, f"{W}rStyle")
+            comma_rs.set(f"{W}val", "FootnoteReference")
+            comma_t = etree.SubElement(comma_r, f"{W}t")
+            comma_t.text = ","
+
         r = etree.SubElement(para, f"{W}r")
         rpr = etree.SubElement(r, f"{W}rPr")
         rs = etree.SubElement(rpr, f"{W}rStyle")

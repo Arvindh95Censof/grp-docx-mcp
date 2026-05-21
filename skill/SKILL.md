@@ -344,7 +344,7 @@ The `validate_footnotes()` tool checks reference/definition matching. Always run
 
 **Citing the same source multiple times:** You cannot reference the same footnote ID from two places. Call `add_footnote()` once per citation point — N citations of the same source = N separate `add_footnote()` calls, each with its own ID. Never reuse a footnote ID across paragraphs.
 
-**Multi-source citations at a single point:** When multiple sources support one statement, make successive `add_footnote()` calls at the same paragraph. They appear as consecutive superscripts (e.g., ¹²³).
+**Multi-source citations at a single point:** When multiple sources support one statement, make successive `add_footnote()` calls at the same paragraph. They render as comma-delimited superscripts (e.g., ¹,²,³) — `add_footnote()` automatically inserts a superscript comma run when the last run of the target paragraph is already a footnote reference.
 
 **Word Recovery Warning:** When Word recovers/repairs a file, it renumbers ALL footnotes sequentially by document position, not by original ID. After any Word recovery, re-examine footnotes before further edits.
 
