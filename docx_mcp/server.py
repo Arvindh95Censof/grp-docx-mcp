@@ -780,6 +780,18 @@ def add_footnote(para_id: str, text: str, url: str = "", document_handle: str = 
 
 
 @mcp.tool()
+def add_footnote_ref(para_id: str, footnote_id: int, document_handle: str = "") -> str:
+    """Add a subsequent reference to an existing footnote without creating a new definition.
+
+    Use when the same source must be cited again in a different paragraph. Inserts a
+    hyperlink-wrapped footnoteReference that navigates to the same footnote as the
+    original citation. Does not duplicate the footnote definition in footnotes.xml.
+    """
+    _, doc = _resolve(document_handle)
+    return _js(doc.add_footnote_ref(para_id, footnote_id))
+
+
+@mcp.tool()
 def validate_footnotes(document_handle: str = "") -> str:
     """Cross-reference footnote IDs between document.xml and footnotes.xml."""
     _, doc = _resolve(document_handle)

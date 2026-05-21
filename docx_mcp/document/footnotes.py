@@ -17,6 +17,23 @@ _R_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 class FootnotesMixin:
     """Footnote operations."""
 
+    def _next_global_markup_id(self) -> int:
+        """Return max bookmark/markup w:id across all loaded parts + 1."""
+        max_id = 0
+        markup_tags = (
+            f"{W}bookmarkStart", f"{W}bookmarkEnd",
+            f"{W}ins", f"{W}del",
+            f"{W}commentRangeStart", f"{W}commentRangeEnd",
+        )
+        for tree in self._trees.values():
+            for tag in markup_tags:
+                for el in tree.iter(tag):
+                    eid = el.get(f"{W}id")
+                    if eid:
+                        with contextlib.suppress(ValueError):
+                            max_id = max(max_id, int(eid))
+        return max_id + 1
+
     def get_footnotes(self) -> list[dict]:
         fn_tree = self._tree("word/footnotes.xml")
         if fn_tree is None:
@@ -79,14 +96,21 @@ class FootnotesMixin:
         # Next ID
         existing = {int(f.get(f"{W}id", "0")) for f in fn_tree.findall(f"{W}footnote")}
         next_id = max(existing | {0}) + 1
+        anchor = f"_Fn{next_id}"
 
-        # Build footnote in footnotes.xml
+        # ── Build footnote definition in footnotes.xml ────────────────────────
         fn_el = etree.SubElement(fn_tree, f"{W}footnote")
         fn_el.set(f"{W}id", str(next_id))
 
         fn_para = etree.SubElement(fn_el, f"{W}p")
         fn_para.set(f"{W14}paraId", self._new_para_id())
         fn_para.set(f"{W14}textId", "77777777")
+
+        # Bookmark so the body hyperlink can navigate here (also enables PDF export links)
+        bm_id = self._next_global_markup_id()
+        bm_start = etree.SubElement(fn_para, f"{W}bookmarkStart")
+        bm_start.set(f"{W}id", str(bm_id))
+        bm_start.set(f"{W}name", anchor)
 
         ppr = etree.SubElement(fn_para, f"{W}pPr")
         ps = etree.SubElement(ppr, f"{W}pStyle")
@@ -108,33 +132,47 @@ class FootnotesMixin:
         if text:
             txt_run = etree.SubElement(fn_para, f"{W}r")
             txt_t = etree.SubElement(txt_run, f"{W}t")
-            if url:
-                # Add trailing space before the hyperlink
-                _preserve(txt_t, text + " ")
-            else:
-                _preserve(txt_t, text)
+            _preserve(txt_t, text + (" " if url else ""))
 
         # Hotlinked URL (if provided)
         if url:
             r_id = self._add_external_hyperlink_rel("word/_rels/footnotes.xml.rels", url)
-            hl = etree.SubElement(fn_para, f"{W}hyperlink")
-            hl.set(f"{{{_R_NS}}}id", r_id)
-            url_run = etree.SubElement(hl, f"{W}r")
+            url_hl = etree.SubElement(fn_para, f"{W}hyperlink")
+            url_hl.set(f"{{{_R_NS}}}id", r_id)
+            url_run = etree.SubElement(url_hl, f"{W}r")
             url_rpr = etree.SubElement(url_run, f"{W}rPr")
             url_rs = etree.SubElement(url_rpr, f"{W}rStyle")
             url_rs.set(f"{W}val", "Hyperlink")
             url_t = etree.SubElement(url_run, f"{W}t")
             _preserve(url_t, url)
 
+        bm_end = etree.SubElement(fn_para, f"{W}bookmarkEnd")
+        bm_end.set(f"{W}id", str(bm_id))
+
         self._mark("word/footnotes.xml")
 
-        # Add reference in document paragraph.
-        # If the last run already carries a footnoteReference, insert a
-        # superscript comma so consecutive refs render as ¹,² not ¹².
-        last_run = next(
-            (c for c in reversed(list(para)) if c.tag == f"{W}r"), None
+        # ── Add in-body reference ─────────────────────────────────────────────
+        # Comma delimiter: if the last substantive child (run or hyperlink) already
+        # contains a footnoteReference, insert a superscript comma first.
+        self._insert_fn_ref(para, next_id, anchor)
+        self._mark("word/document.xml")
+
+        result: dict = {"footnote_id": next_id, "para_id": para_id}
+        if url:
+            result["url"] = url
+        return result
+
+    def _insert_fn_ref(self, para: etree._Element, footnote_id: int, anchor: str) -> None:
+        """Append a hyperlink-wrapped footnoteReference run to para, with comma if needed."""
+        last_elem = next(
+            (c for c in reversed(list(para))
+             if c.tag in (f"{W}r", f"{W}hyperlink")),
+            None,
         )
-        if last_run is not None and last_run.find(f"{W}footnoteReference") is not None:
+        needs_comma = last_elem is not None and bool(
+            list(last_elem.iter(f"{W}footnoteReference"))
+        )
+        if needs_comma:
             comma_r = etree.SubElement(para, f"{W}r")
             comma_rpr = etree.SubElement(comma_r, f"{W}rPr")
             comma_rs = etree.SubElement(comma_rpr, f"{W}rStyle")
@@ -142,18 +180,59 @@ class FootnotesMixin:
             comma_t = etree.SubElement(comma_r, f"{W}t")
             comma_t.text = ","
 
-        r = etree.SubElement(para, f"{W}r")
+        hl = etree.SubElement(para, f"{W}hyperlink")
+        hl.set(f"{W}anchor", anchor)
+        r = etree.SubElement(hl, f"{W}r")
         rpr = etree.SubElement(r, f"{W}rPr")
         rs = etree.SubElement(rpr, f"{W}rStyle")
         rs.set(f"{W}val", "FootnoteReference")
         fref = etree.SubElement(r, f"{W}footnoteReference")
-        fref.set(f"{W}id", str(next_id))
-        self._mark("word/document.xml")
+        fref.set(f"{W}id", str(footnote_id))
 
-        result: dict = {"footnote_id": next_id, "para_id": para_id}
-        if url:
-            result["url"] = url
-        return result
+    def add_footnote_ref(self, para_id: str, footnote_id: int) -> dict:
+        """Add a subsequent reference to an existing footnote without creating a new definition.
+
+        Inserts a hyperlink anchored to the footnote's bookmark (_FnN), wrapping a
+        footnoteReference run. Use this when the same source needs to be cited again
+        in a different paragraph — no new footnote definition is created.
+        """
+        doc = self._require("word/document.xml")
+        fn_tree = self._require("word/footnotes.xml")
+
+        existing_ids = {int(f.get(f"{W}id", "0")) for f in self._real_footnotes(fn_tree)}
+        if footnote_id not in existing_ids:
+            raise ValueError(f"Footnote id {footnote_id} not found")
+
+        para = self._find_para(doc, para_id)
+        if para is None:
+            raise ValueError(f"Paragraph '{para_id}' not found")
+
+        anchor = f"_Fn{footnote_id}"
+
+        # Ensure the target footnote has a bookmark (retroactively add if missing)
+        target_fn = next(
+            fn for fn in fn_tree.findall(f"{W}footnote")
+            if fn.get(f"{W}id") == str(footnote_id)
+        )
+        has_bookmark = any(
+            el.get(f"{W}name") == anchor
+            for el in target_fn.iter(f"{W}bookmarkStart")
+        )
+        if not has_bookmark:
+            fn_para = target_fn.find(f"{W}p")
+            if fn_para is not None:
+                bm_id = self._next_global_markup_id()
+                bm_start = etree.Element(f"{W}bookmarkStart")
+                bm_start.set(f"{W}id", str(bm_id))
+                bm_start.set(f"{W}name", anchor)
+                fn_para.insert(0, bm_start)
+                bm_end = etree.SubElement(fn_para, f"{W}bookmarkEnd")
+                bm_end.set(f"{W}id", str(bm_id))
+                self._mark("word/footnotes.xml")
+
+        self._insert_fn_ref(para, footnote_id, anchor)
+        self._mark("word/document.xml")
+        return {"footnote_id": footnote_id, "para_id": para_id}
 
     def update_footnote(self, footnote_id: int, text: str) -> dict:
         """Update the text of an existing footnote.
@@ -228,16 +307,22 @@ class FootnotesMixin:
             raise ValueError(f"Footnote id {footnote_id} not found")
         fn_tree.remove(target)
         self._mark("word/footnotes.xml")
-        # Remove in-body reference run
+        # Remove in-body reference: the run may be wrapped in a <w:hyperlink> container
         doc = self._tree("word/document.xml")
         if doc is not None:
             for ref_el in doc.iter(f"{W}footnoteReference"):
                 if ref_el.get(f"{W}id") == str(footnote_id):
                     ref_run = ref_el.getparent()
                     if ref_run is not None:
-                        para = ref_run.getparent()
-                        if para is not None:
-                            para.remove(ref_run)
+                        container = ref_run.getparent()
+                        if container is not None:
+                            if container.tag == f"{W}hyperlink":
+                                # Remove the entire hyperlink wrapper from its parent
+                                grandparent = container.getparent()
+                                if grandparent is not None:
+                                    grandparent.remove(container)
+                            else:
+                                container.remove(ref_run)
                     self._mark("word/document.xml")
                     break
         return {"deleted": footnote_id}
