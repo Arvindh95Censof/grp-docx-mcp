@@ -157,6 +157,12 @@ class ListsMixin:
             jc_el.set(f"{W}val", "left")
 
             pPr = etree.SubElement(lvl, f"{W}pPr")
+            # Explicit tab stop pins text-start to w:left regardless of number width.
+            # Without this, Word drifts text rightward as numbers grow (e.g. "1" vs "24.1.1").
+            tabs_el = etree.SubElement(pPr, f"{W}tabs")
+            tab_el = etree.SubElement(tabs_el, f"{W}tab")
+            tab_el.set(f"{W}val", "num")
+            tab_el.set(f"{W}pos", str(lvl_def.get("indent", 720)))
             ind = etree.SubElement(pPr, f"{W}ind")
             ind.set(f"{W}left", str(lvl_def.get("indent", 720)))
             ind.set(f"{W}hanging", str(lvl_def.get("hanging", 360)))

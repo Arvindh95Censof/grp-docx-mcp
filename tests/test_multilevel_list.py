@@ -152,3 +152,40 @@ class TestMultilevelList:
         pStyle = pPr.find(f"{W}pStyle")  # inside pPr, not lvl
         assert pStyle is not None
         assert pStyle.get(f"{W}val") == "Heading 1"
+
+    def test_each_level_has_num_tab_stop_at_left_indent(self, tmp_path):
+        """Every w:lvl must have a w:tabs/w:tab[@w:val='num'] at w:pos == w:ind/@w:left.
+
+        Without this explicit tab stop, Word uses default tab intervals and the
+        text after the number drifts rightward as numbers grow longer (e.g.
+        '24.1' vs '24.1.1'), producing misaligned section headings.
+        """
+        levels = [
+            {"num_fmt": "decimal", "lvl_text": "%1.", "indent": 720, "hanging": 360},
+            {"num_fmt": "decimal", "lvl_text": "%1.%2.", "indent": 1440, "hanging": 360},
+            {"num_fmt": "decimal", "lvl_text": "%1.%2.%3.", "indent": 2160, "hanging": 720},
+        ]
+        doc = _make_doc(tmp_path)
+        result = doc.create_multilevel_list("SectionHeadings", levels)
+        num_tree = doc._tree("word/numbering.xml")
+        abs_id = str(result["abstract_num_id"])
+        abstract = next(
+            a for a in num_tree.findall(f"{W}abstractNum")
+            if a.get(f"{W}abstractNumId") == abs_id
+        )
+        for ilvl, lvl_def in enumerate(levels):
+            lvl = abstract.findall(f"{W}lvl")[ilvl]
+            pPr = lvl.find(f"{W}pPr")
+            assert pPr is not None, f"ilvl={ilvl}: missing w:pPr"
+            tabs = pPr.find(f"{W}tabs")
+            assert tabs is not None, f"ilvl={ilvl}: missing w:tabs in w:pPr"
+            tab_els = tabs.findall(f"{W}tab")
+            assert tab_els, f"ilvl={ilvl}: no w:tab children"
+            num_tab = next(
+                (t for t in tab_els if t.get(f"{W}val") == "num"), None
+            )
+            assert num_tab is not None, f"ilvl={ilvl}: no w:tab[@w:val='num']"
+            expected_pos = str(lvl_def["indent"])
+            assert num_tab.get(f"{W}pos") == expected_pos, (
+                f"ilvl={ilvl}: tab pos={num_tab.get(f'{W}pos')!r}, want {expected_pos!r}"
+            )

@@ -348,26 +348,26 @@ _SETTINGS_XML = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 _NUMBERING_XML = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:abstractNum w:abstractNumId="0">
-    <w:lvl w:ilvl="0"><w:numFmt w:val="bullet"/><w:lvlText w:val="\u2022"/><w:pPr><w:ind w:left="720" w:hanging="360"/></w:pPr></w:lvl>
-    <w:lvl w:ilvl="1"><w:numFmt w:val="bullet"/><w:lvlText w:val="\u25e6"/><w:pPr><w:ind w:left="1440" w:hanging="360"/></w:pPr></w:lvl>
-    <w:lvl w:ilvl="2"><w:numFmt w:val="bullet"/><w:lvlText w:val="\u25aa"/><w:pPr><w:ind w:left="2160" w:hanging="360"/></w:pPr></w:lvl>
-    <w:lvl w:ilvl="3"><w:numFmt w:val="bullet"/><w:lvlText w:val="\u2022"/><w:pPr><w:ind w:left="2880" w:hanging="360"/></w:pPr></w:lvl>
-    <w:lvl w:ilvl="4"><w:numFmt w:val="bullet"/><w:lvlText w:val="\u25e6"/><w:pPr><w:ind w:left="3600" w:hanging="360"/></w:pPr></w:lvl>
-    <w:lvl w:ilvl="5"><w:numFmt w:val="bullet"/><w:lvlText w:val="\u25aa"/><w:pPr><w:ind w:left="4320" w:hanging="360"/></w:pPr></w:lvl>
-    <w:lvl w:ilvl="6"><w:numFmt w:val="bullet"/><w:lvlText w:val="\u2022"/><w:pPr><w:ind w:left="5040" w:hanging="360"/></w:pPr></w:lvl>
-    <w:lvl w:ilvl="7"><w:numFmt w:val="bullet"/><w:lvlText w:val="\u25e6"/><w:pPr><w:ind w:left="5760" w:hanging="360"/></w:pPr></w:lvl>
-    <w:lvl w:ilvl="8"><w:numFmt w:val="bullet"/><w:lvlText w:val="\u25aa"/><w:pPr><w:ind w:left="6480" w:hanging="360"/></w:pPr></w:lvl>
+    <w:lvl w:ilvl="0"><w:numFmt w:val="bullet"/><w:lvlText w:val="\u2022"/><w:pPr><w:tabs><w:tab w:val="num" w:pos="720"/></w:tabs><w:ind w:left="720" w:hanging="360"/></w:pPr></w:lvl>
+    <w:lvl w:ilvl="1"><w:numFmt w:val="bullet"/><w:lvlText w:val="\u25e6"/><w:pPr><w:tabs><w:tab w:val="num" w:pos="1440"/></w:tabs><w:ind w:left="1440" w:hanging="360"/></w:pPr></w:lvl>
+    <w:lvl w:ilvl="2"><w:numFmt w:val="bullet"/><w:lvlText w:val="\u25aa"/><w:pPr><w:tabs><w:tab w:val="num" w:pos="2160"/></w:tabs><w:ind w:left="2160" w:hanging="360"/></w:pPr></w:lvl>
+    <w:lvl w:ilvl="3"><w:numFmt w:val="bullet"/><w:lvlText w:val="\u2022"/><w:pPr><w:tabs><w:tab w:val="num" w:pos="2880"/></w:tabs><w:ind w:left="2880" w:hanging="360"/></w:pPr></w:lvl>
+    <w:lvl w:ilvl="4"><w:numFmt w:val="bullet"/><w:lvlText w:val="\u25e6"/><w:pPr><w:tabs><w:tab w:val="num" w:pos="3600"/></w:tabs><w:ind w:left="3600" w:hanging="360"/></w:pPr></w:lvl>
+    <w:lvl w:ilvl="5"><w:numFmt w:val="bullet"/><w:lvlText w:val="\u25aa"/><w:pPr><w:tabs><w:tab w:val="num" w:pos="4320"/></w:tabs><w:ind w:left="4320" w:hanging="360"/></w:pPr></w:lvl>
+    <w:lvl w:ilvl="6"><w:numFmt w:val="bullet"/><w:lvlText w:val="\u2022"/><w:pPr><w:tabs><w:tab w:val="num" w:pos="5040"/></w:tabs><w:ind w:left="5040" w:hanging="360"/></w:pPr></w:lvl>
+    <w:lvl w:ilvl="7"><w:numFmt w:val="bullet"/><w:lvlText w:val="\u25e6"/><w:pPr><w:tabs><w:tab w:val="num" w:pos="5760"/></w:tabs><w:ind w:left="5760" w:hanging="360"/></w:pPr></w:lvl>
+    <w:lvl w:ilvl="8"><w:numFmt w:val="bullet"/><w:lvlText w:val="\u25aa"/><w:pPr><w:tabs><w:tab w:val="num" w:pos="6480"/></w:tabs><w:ind w:left="6480" w:hanging="360"/></w:pPr></w:lvl>
   </w:abstractNum>
   <w:abstractNum w:abstractNumId="1">
-    <w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/><w:pPr><w:ind w:left="720" w:hanging="360"/></w:pPr></w:lvl>
-    <w:lvl w:ilvl="1"><w:numFmt w:val="lowerLetter"/><w:lvlText w:val="%2."/><w:pPr><w:ind w:left="1440" w:hanging="360"/></w:pPr></w:lvl>
-    <w:lvl w:ilvl="2"><w:numFmt w:val="lowerRoman"/><w:lvlText w:val="%3."/><w:pPr><w:ind w:left="2160" w:hanging="360"/></w:pPr></w:lvl>
-    <w:lvl w:ilvl="3"><w:numFmt w:val="decimal"/><w:lvlText w:val="%4."/><w:pPr><w:ind w:left="2880" w:hanging="360"/></w:pPr></w:lvl>
-    <w:lvl w:ilvl="4"><w:numFmt w:val="lowerLetter"/><w:lvlText w:val="%5."/><w:pPr><w:ind w:left="3600" w:hanging="360"/></w:pPr></w:lvl>
-    <w:lvl w:ilvl="5"><w:numFmt w:val="lowerRoman"/><w:lvlText w:val="%6."/><w:pPr><w:ind w:left="4320" w:hanging="360"/></w:pPr></w:lvl>
-    <w:lvl w:ilvl="6"><w:numFmt w:val="decimal"/><w:lvlText w:val="%7."/><w:pPr><w:ind w:left="5040" w:hanging="360"/></w:pPr></w:lvl>
-    <w:lvl w:ilvl="7"><w:numFmt w:val="lowerLetter"/><w:lvlText w:val="%8."/><w:pPr><w:ind w:left="5760" w:hanging="360"/></w:pPr></w:lvl>
-    <w:lvl w:ilvl="8"><w:numFmt w:val="lowerRoman"/><w:lvlText w:val="%9."/><w:pPr><w:ind w:left="6480" w:hanging="360"/></w:pPr></w:lvl>
+    <w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/><w:pPr><w:tabs><w:tab w:val="num" w:pos="720"/></w:tabs><w:ind w:left="720" w:hanging="360"/></w:pPr></w:lvl>
+    <w:lvl w:ilvl="1"><w:numFmt w:val="lowerLetter"/><w:lvlText w:val="%2."/><w:pPr><w:tabs><w:tab w:val="num" w:pos="1440"/></w:tabs><w:ind w:left="1440" w:hanging="360"/></w:pPr></w:lvl>
+    <w:lvl w:ilvl="2"><w:numFmt w:val="lowerRoman"/><w:lvlText w:val="%3."/><w:pPr><w:tabs><w:tab w:val="num" w:pos="2160"/></w:tabs><w:ind w:left="2160" w:hanging="360"/></w:pPr></w:lvl>
+    <w:lvl w:ilvl="3"><w:numFmt w:val="decimal"/><w:lvlText w:val="%4."/><w:pPr><w:tabs><w:tab w:val="num" w:pos="2880"/></w:tabs><w:ind w:left="2880" w:hanging="360"/></w:pPr></w:lvl>
+    <w:lvl w:ilvl="4"><w:numFmt w:val="lowerLetter"/><w:lvlText w:val="%5."/><w:pPr><w:tabs><w:tab w:val="num" w:pos="3600"/></w:tabs><w:ind w:left="3600" w:hanging="360"/></w:pPr></w:lvl>
+    <w:lvl w:ilvl="5"><w:numFmt w:val="lowerRoman"/><w:lvlText w:val="%6."/><w:pPr><w:tabs><w:tab w:val="num" w:pos="4320"/></w:tabs><w:ind w:left="4320" w:hanging="360"/></w:pPr></w:lvl>
+    <w:lvl w:ilvl="6"><w:numFmt w:val="decimal"/><w:lvlText w:val="%7."/><w:pPr><w:tabs><w:tab w:val="num" w:pos="5040"/></w:tabs><w:ind w:left="5040" w:hanging="360"/></w:pPr></w:lvl>
+    <w:lvl w:ilvl="7"><w:numFmt w:val="lowerLetter"/><w:lvlText w:val="%8."/><w:pPr><w:tabs><w:tab w:val="num" w:pos="5760"/></w:tabs><w:ind w:left="5760" w:hanging="360"/></w:pPr></w:lvl>
+    <w:lvl w:ilvl="8"><w:numFmt w:val="lowerRoman"/><w:lvlText w:val="%9."/><w:pPr><w:tabs><w:tab w:val="num" w:pos="6480"/></w:tabs><w:ind w:left="6480" w:hanging="360"/></w:pPr></w:lvl>
   </w:abstractNum>
   <w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num>
   <w:num w:numId="2"><w:abstractNumId w:val="1"/></w:num>
