@@ -76,8 +76,6 @@ class TestFootnoteCRUD:
 
     def test_consecutive_footnotes_produce_comma_delimiter(self):
         """Two add_footnote() calls on the same paragraph insert a superscript comma between refs."""
-        from lxml import etree
-
         W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
         W14 = "http://schemas.microsoft.com/office/word/2010/wordml"
 
@@ -85,11 +83,9 @@ class TestFootnoteCRUD:
         r2 = _j(server.add_footnote("00000004", "Second source"))
         id1, id2 = r1["footnote_id"], r2["footnote_id"]
 
-        # Inspect raw document XML via the server's internal document registry
         doc_obj = server._docs[server._DEFAULT_HANDLE]
         doc_tree = doc_obj._tree("word/document.xml")
 
-        # Find the paragraph by paraId
         para = None
         for p in doc_tree.iter(f"{{{W}}}p"):
             if p.get(f"{{{W14}}}paraId") == "00000004":
@@ -97,29 +93,175 @@ class TestFootnoteCRUD:
                 break
         assert para is not None, "Paragraph 00000004 not found"
 
-        # Collect the tail of children: [... fn_ref(id1), comma_run, fn_ref(id2)]
         children = list(para)
-        fn_runs = [
+        # Footnote refs are wrapped in <w:hyperlink w:anchor="_FnN">
+        fn_elems = [
             c for c in children
-            if c.tag == f"{{{W}}}r" and c.find(f"{{{W}}}footnoteReference") is not None
+            if (
+                c.tag == f"{{{W}}}hyperlink"
+                and list(c.iter(f"{{{W}}}footnoteReference"))
+            ) or (
+                c.tag == f"{{{W}}}r"
+                and c.find(f"{{{W}}}footnoteReference") is not None
+            )
         ]
-        assert len(fn_runs) >= 2, "Expected at least two footnote reference runs"
+        assert len(fn_elems) >= 2, "Expected at least two footnote reference elements"
 
-        # The runs for id1 and id2 should be separated by exactly one comma run
-        idx1 = children.index(fn_runs[-2])
-        idx2 = children.index(fn_runs[-1])
-        assert idx2 == idx1 + 2, "Comma run should sit between the two consecutive fn ref runs"
+        idx1 = children.index(fn_elems[-2])
+        idx2 = children.index(fn_elems[-1])
+        assert idx2 == idx1 + 2, "Comma run should sit between the two consecutive fn ref elements"
 
         between = children[idx1 + 1]
         assert between.tag == f"{{{W}}}r"
         t_el = between.find(f"{{{W}}}t")
         assert t_el is not None and t_el.text == ",", "Separator run must contain a single comma"
 
-        # Confirm the footnote ref IDs are correct
-        ref1 = fn_runs[-2].find(f"{{{W}}}footnoteReference").get(f"{{{W}}}id")
-        ref2 = fn_runs[-1].find(f"{{{W}}}footnoteReference").get(f"{{{W}}}id")
+        ref1 = next(fn_elems[-2].iter(f"{{{W}}}footnoteReference")).get(f"{{{W}}}id")
+        ref2 = next(fn_elems[-1].iter(f"{{{W}}}footnoteReference")).get(f"{{{W}}}id")
         assert ref1 == str(id1)
         assert ref2 == str(id2)
+
+    def test_body_ref_wrapped_in_internal_hyperlink(self):
+        """add_footnote wraps the footnoteReference run in <w:hyperlink w:anchor='_FnN'>."""
+        W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+
+        result = _j(server.add_footnote("00000004", "Some source"))
+        fid = result["footnote_id"]
+
+        doc_obj = server._docs[server._DEFAULT_HANDLE]
+        doc_tree = doc_obj._tree("word/document.xml")
+
+        hyperlinks = [
+            el for el in doc_tree.iter(f"{{{W}}}hyperlink")
+            if list(el.iter(f"{{{W}}}footnoteReference"))
+            and el.get(f"{{{W}}}anchor") == f"_Fn{fid}"
+        ]
+        assert len(hyperlinks) == 1, (
+            f"Expected exactly one <w:hyperlink w:anchor='_Fn{fid}'>, found {len(hyperlinks)}"
+        )
+
+    def test_footnote_definition_has_bookmark(self):
+        """add_footnote adds <w:bookmarkStart w:name='_FnN'/> in the footnote definition."""
+        W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+
+        result = _j(server.add_footnote("00000004", "Source text"))
+        fid = result["footnote_id"]
+
+        doc_obj = server._docs[server._DEFAULT_HANDLE]
+        fn_tree = doc_obj._tree("word/footnotes.xml")
+
+        target_fn = next(
+            fn for fn in fn_tree.findall(f"{{{W}}}footnote")
+            if fn.get(f"{{{W}}}id") == str(fid)
+        )
+        bookmarks = [
+            el for el in target_fn.iter(f"{{{W}}}bookmarkStart")
+            if el.get(f"{{{W}}}name") == f"_Fn{fid}"
+        ]
+        assert len(bookmarks) == 1, f"Expected bookmark '_Fn{fid}' in footnote definition"
+
+    def test_delete_footnote_removes_hyperlink_container(self):
+        """delete_footnote removes the <w:hyperlink> wrapper when ref is hyperlink-wrapped."""
+        W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+
+        result = _j(server.add_footnote("00000004", "To be deleted"))
+        fid = result["footnote_id"]
+
+        server.delete_footnote(fid)
+
+        doc_obj = server._docs[server._DEFAULT_HANDLE]
+        doc_tree = doc_obj._tree("word/document.xml")
+
+        remaining = [
+            el for el in doc_tree.iter(f"{{{W}}}hyperlink")
+            if el.get(f"{{{W}}}anchor") == f"_Fn{fid}"
+        ]
+        assert remaining == [], "Hyperlink container must be removed on delete"
+
+
+class TestFootnoteRef:
+    @pytest.fixture(autouse=True)
+    def _open(self, test_docx: Path):
+        server.open_document(str(test_docx))
+
+    def test_add_footnote_ref_creates_hyperlink_in_body(self):
+        """add_footnote_ref inserts a hyperlink to the existing footnote's anchor."""
+        W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+
+        add_result = _j(server.add_footnote("00000004", "Original footnote"))
+        fid = add_result["footnote_id"]
+
+        ref_result = _j(server.add_footnote_ref("00000003", fid))
+        assert ref_result["footnote_id"] == fid
+
+        doc_obj = server._docs[server._DEFAULT_HANDLE]
+        doc_tree = doc_obj._tree("word/document.xml")
+
+        hyperlinks = [
+            el for el in doc_tree.iter(f"{{{W}}}hyperlink")
+            if el.get(f"{{{W}}}anchor") == f"_Fn{fid}"
+        ]
+        # One from add_footnote (para 00000004), one from add_footnote_ref (para 00000003)
+        assert len(hyperlinks) == 2, f"Expected 2 hyperlinks to _Fn{fid}, found {len(hyperlinks)}"
+
+    def test_add_footnote_ref_not_found_raises(self):
+        """add_footnote_ref raises ValueError for a non-existent footnote ID."""
+        with pytest.raises(ValueError, match="not found"):
+            server.add_footnote_ref("00000004", 999)
+
+    def test_add_footnote_ref_does_not_create_new_definition(self):
+        """add_footnote_ref does NOT add a new entry in footnotes.xml."""
+        W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+
+        add_result = _j(server.add_footnote("00000004", "Original"))
+        fid = add_result["footnote_id"]
+
+        doc_obj = server._docs[server._DEFAULT_HANDLE]
+        fn_tree = doc_obj._tree("word/footnotes.xml")
+        count_before = len(fn_tree.findall(f"{{{W}}}footnote"))
+
+        server.add_footnote_ref("00000003", fid)
+        count_after = len(fn_tree.findall(f"{{{W}}}footnote"))
+
+        assert count_after == count_before, "add_footnote_ref must not create a new footnote definition"
+
+    def test_add_footnote_ref_comma_delimiter_with_existing_ref(self):
+        """add_footnote_ref inserts comma when the target paragraph already ends with a ref."""
+        W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+        W14 = "http://schemas.microsoft.com/office/word/2010/wordml"
+
+        add_result = _j(server.add_footnote("00000004", "Source A"))
+        fid = add_result["footnote_id"]
+
+        # Add a second footnote to para 00000003
+        _j(server.add_footnote("00000003", "Source B"))
+        # Now add a ref to fid on the same para 00000003 (should insert comma)
+        _j(server.add_footnote_ref("00000003", fid))
+
+        doc_obj = server._docs[server._DEFAULT_HANDLE]
+        doc_tree = doc_obj._tree("word/document.xml")
+
+        para = next(
+            p for p in doc_tree.iter(f"{{{W}}}p")
+            if p.get(f"{{{W14}}}paraId") == "00000003"
+        )
+        children = list(para)
+        fn_elems = [
+            c for c in children
+            if (
+                c.tag == f"{{{W}}}hyperlink" and list(c.iter(f"{{{W}}}footnoteReference"))
+            ) or (
+                c.tag == f"{{{W}}}r" and c.find(f"{{{W}}}footnoteReference") is not None
+            )
+        ]
+        assert len(fn_elems) >= 2
+
+        # Last two fn elements must be separated by a comma run
+        idx1 = children.index(fn_elems[-2])
+        idx2 = children.index(fn_elems[-1])
+        assert idx2 == idx1 + 2
+        comma_t = children[idx1 + 1].find(f"{{{W}}}t")
+        assert comma_t is not None and comma_t.text == ","
 
 
 # ═══════════════════════════════════════════════════════════════════════════
