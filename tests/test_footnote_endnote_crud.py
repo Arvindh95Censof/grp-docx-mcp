@@ -181,3 +181,128 @@ class TestEndnoteCRUD:
         endnotes = _j(server.get_endnotes())
         en = next(e for e in endnotes if e["id"] == eid)
         assert "Revised endnote" in en["text"]
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  TestFootnoteUrlHotlink
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestFootnoteUrlHotlink:
+    @pytest.fixture(autouse=True)
+    def _open(self, test_docx: Path):
+        server.open_document(str(test_docx))
+
+    def test_add_footnote_with_url_contains_hyperlink_element(self):
+        """add_footnote with url= produces a <w:hyperlink> in the footnote body."""
+        from lxml import etree
+
+        W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+        R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+
+        result = _j(server.add_footnote("00000004", "See reference", url="https://example.com"))
+        fid = result["footnote_id"]
+
+        doc_obj = server._docs[server._DEFAULT_HANDLE]
+        fn_tree = doc_obj._tree("word/footnotes.xml")
+
+        target_fn = None
+        for fn in fn_tree.findall(f"{{{W}}}footnote"):
+            if fn.get(f"{{{W}}}id") == str(fid):
+                target_fn = fn
+                break
+        assert target_fn is not None, f"Footnote {fid} not found"
+
+        # Must contain a w:hyperlink element
+        hyperlinks = list(target_fn.iter(f"{{{W}}}hyperlink"))
+        assert len(hyperlinks) == 1, "Expected exactly one <w:hyperlink>"
+
+        hl = hyperlinks[0]
+        r_id = hl.get(f"{{{R}}}id")
+        assert r_id is not None and r_id.startswith("rId"), f"Hyperlink missing r:id, got {r_id!r}"
+
+        # The hyperlink run must have Hyperlink rStyle and the URL as text
+        runs = hl.findall(f"{{{W}}}r")
+        assert runs, "Hyperlink must contain at least one <w:r>"
+        url_text = "".join(t.text for t in hl.iter(f"{{{W}}}t") if t.text)
+        assert "https://example.com" in url_text
+
+        # Run must carry Hyperlink character style
+        rpr = runs[0].find(f"{{{W}}}rPr")
+        assert rpr is not None
+        rs = rpr.find(f"{{{W}}}rStyle")
+        assert rs is not None and rs.get(f"{{{W}}}val") == "Hyperlink"
+
+    def test_add_footnote_with_url_creates_rels_entry(self):
+        """add_footnote with url= registers an External relationship in footnotes.xml.rels."""
+        RELS_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
+        URL = "https://example.com/source"
+
+        result = _j(server.add_footnote("00000004", "Cited source", url=URL))
+        fid = result["footnote_id"]
+
+        doc_obj = server._docs[server._DEFAULT_HANDLE]
+        rels = doc_obj._tree("word/_rels/footnotes.xml.rels")
+        assert rels is not None, "word/_rels/footnotes.xml.rels was not created"
+
+        relationships = rels.findall(f"{{{RELS_NS}}}Relationship")
+        external_for_url = [
+            r for r in relationships
+            if r.get("Target") == URL and r.get("TargetMode") == "External"
+        ]
+        assert len(external_for_url) == 1, (
+            f"Expected one External relationship for {URL!r}, found {len(external_for_url)}"
+        )
+
+    def test_add_footnote_without_url_no_hyperlink(self):
+        """add_footnote without url= produces no <w:hyperlink> (backward-compat)."""
+        from lxml import etree
+
+        W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+
+        result = _j(server.add_footnote("00000004", "Plain footnote text"))
+        fid = result["footnote_id"]
+
+        doc_obj = server._docs[server._DEFAULT_HANDLE]
+        fn_tree = doc_obj._tree("word/footnotes.xml")
+
+        target_fn = next(
+            fn for fn in fn_tree.findall(f"{{{W}}}footnote")
+            if fn.get(f"{{{W}}}id") == str(fid)
+        )
+        hyperlinks = list(target_fn.iter(f"{{{W}}}hyperlink"))
+        assert hyperlinks == [], "No hyperlink expected when url is omitted"
+
+    def test_add_footnote_two_urls_get_distinct_rids(self):
+        """Two add_footnote calls with different URLs register distinct rId values."""
+        RELS_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
+        W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+        R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+
+        server.add_footnote("00000004", "First", url="https://alpha.example.com")
+        server.add_footnote("00000004", "Second", url="https://beta.example.com")
+
+        doc_obj = server._docs[server._DEFAULT_HANDLE]
+        fn_tree = doc_obj._tree("word/footnotes.xml")
+
+        r_ids = []
+        for fn in fn_tree.findall(f"{{{W}}}footnote"):
+            for hl in fn.iter(f"{{{W}}}hyperlink"):
+                rid = hl.get(f"{{{R}}}id")
+                if rid:
+                    r_ids.append(rid)
+
+        assert len(r_ids) == 2, f"Expected 2 hyperlinks, got {len(r_ids)}"
+        assert r_ids[0] != r_ids[1], "Both hyperlinks must have distinct rId values"
+
+        rels = doc_obj._tree("word/_rels/footnotes.xml.rels")
+        assert rels is not None
+        rels_ns = RELS_NS
+        targets = {r.get("Target") for r in rels.findall(f"{{{rels_ns}}}Relationship")}
+        assert "https://alpha.example.com" in targets
+        assert "https://beta.example.com" in targets
+
+    def test_add_footnote_url_present_in_result(self):
+        """Return dict from add_footnote includes url when provided."""
+        result = _j(server.add_footnote("00000004", "Label", url="https://ref.example.com"))
+        assert result.get("url") == "https://ref.example.com"
