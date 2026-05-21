@@ -213,6 +213,7 @@ Fitting: `chars × dxa_per_char ≤ column_width − 240` (240 = default cell ma
 |------|---------|----------|
 | `get_footnotes` | List all footnotes | — |
 | `add_footnote` | Footnote with superscript ref | `para_id`, `text`, `url` (optional hotlink) |
+| `add_footnote_ref` | Subsequent ref to existing footnote | `para_id`, `footnote_id` |
 | `validate_footnotes` | Cross-ref footnote IDs | — |
 | `get_endnotes` | List all endnotes | — |
 | `add_endnote` | Endnote with superscript ref | `para_id`, `text` |
@@ -420,6 +421,22 @@ When extracting text from paragraphs that contain footnote references, the super
 ### Template List Indents May Override Your Content
 
 A document template's numbering definition often specifies its own indents. When inserting list content via `add_list()`, verify the rendered indent matches expectations — the template's `w:abstractNum` definition takes precedence. If indents look wrong, the fix requires editing the numbering XML directly (outside docx-mcp's current tool set) or applying explicit paragraph indent overrides.
+
+### Clickable Superscript Cross-References
+
+Every footnote reference superscript created by `add_footnote()` is automatically wrapped in a `<w:hyperlink w:anchor="_FnN">` pointing to a `<w:bookmarkStart w:name="_FnN">` in the footnote definition. This means:
+
+- Clicking the superscript navigates to the footnote in Word **and** in PDF exports.
+- The back-arrow in Word's footnote pane navigates back to the reference in the body.
+
+**Subsequent reference to the same footnote** — use `add_footnote_ref(para_id, footnote_id)` to add another superscript that links to the same footnote without duplicating the definition:
+
+```
+fn_id = add_footnote("00000004", "SWGDE Best Practices")["footnote_id"]
+add_footnote_ref("00000009", fn_id)   # second citation → same footnote
+```
+
+Do NOT call `add_footnote()` twice with the same content — that creates two separate definitions. `add_footnote_ref` retroactively adds the anchor bookmark if the footnote predates this feature.
 
 ### Hotlinked URLs in Footnotes
 

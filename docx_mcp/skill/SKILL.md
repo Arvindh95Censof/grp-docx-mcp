@@ -120,6 +120,7 @@ Supports: headings, bold/italic/strikethrough, links, images, bullet/numbered/ne
 |------|---------|----------|
 | `get_footnotes` | List all footnotes | — |
 | `add_footnote` | Footnote with superscript ref | `para_id`, `text`, `url` (optional hotlink) |
+| `add_footnote_ref` | Subsequent ref to existing footnote | `para_id`, `footnote_id` |
 | `validate_footnotes` | Cross-ref footnote IDs | — |
 | `get_endnotes` | List all endnotes | — |
 | `add_endnote` | Endnote with superscript ref | `para_id`, `text` |
@@ -311,6 +312,19 @@ When extracting text from paragraphs that contain footnote references, the super
 ### Multi-Source Citations Are Comma-Delimited
 
 Calling `add_footnote()` twice on the same paragraph produces comma-delimited superscripts (¹,²,³). `add_footnote()` automatically inserts a superscript comma run when the last run of the target paragraph is already a footnote reference — no extra steps needed.
+
+### Clickable Superscript Cross-References
+
+Every footnote reference superscript created by `add_footnote()` is wrapped in `<w:hyperlink w:anchor="_FnN">` pointing to a bookmark in the footnote definition. Clicking the superscript navigates to the footnote in Word and in PDF exports.
+
+**Subsequent reference to the same footnote** — use `add_footnote_ref(para_id, footnote_id)`:
+
+```
+fn_id = add_footnote("00000004", "Source")["footnote_id"]
+add_footnote_ref("00000009", fn_id)   # second citation → same footnote
+```
+
+Do NOT call `add_footnote()` twice with the same content — that duplicates the definition. `add_footnote_ref` retroactively adds the anchor bookmark if the footnote predates this feature.
 
 ### Hotlinked URLs in Footnotes
 
