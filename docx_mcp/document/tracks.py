@@ -439,6 +439,96 @@ def _apply_deletion(
         parent.insert(pos, _build_run(after_text, after_rpr))
 
 
+def _ins_element(
+    text: str,
+    rpr_bytes: bytes | None,
+    *,
+    cid: int,
+    author: str,
+    now: str,
+    tracked: bool,
+) -> etree._Element:
+    """Return ``w:ins>w:r>w:t`` (tracked) or bare ``w:r>w:t`` (untracked)."""
+    r = etree.Element(f"{W}r")
+    if rpr_bytes:
+        r.append(etree.fromstring(rpr_bytes))
+    t = etree.SubElement(r, f"{W}t")
+    _preserve(t, text)
+    if not tracked:
+        return r
+    ins = etree.Element(f"{W}ins")
+    ins.set(f"{W}id", str(cid))
+    ins.set(f"{W}author", author)
+    ins.set(f"{W}date", now)
+    ins.append(r)
+    return ins
+
+
+def _apply_untracked_deletion(
+    para: etree._Element,
+    slot_s: int,
+    slot_e: int,
+    slots: list[_Slot],
+) -> tuple[etree._Element, int]:
+    """Remove ``slots[slot_s:slot_e]`` directly without ``w:del`` markup.
+
+    Returns ``(parent, insert_pos)`` — the parent element and child index where
+    replacement text should be spliced in.
+    """
+    del_slots = slots[slot_s:slot_e]
+    if not del_slots:
+        return para, slot_s
+
+    run_groups: list[tuple[etree._Element, bytes | None, str]] = []
+    prev: etree._Element | None = None
+    acc: list[str] = []
+    rpr_b: bytes | None = None
+    for s in del_slots:
+        if s.run_el is not prev:
+            if prev is not None:
+                run_groups.append((prev, rpr_b, "".join(acc)))
+            prev = s.run_el
+            rpr_b = s.rpr_bytes
+            acc = [s.char]
+        else:
+            acc.append(s.char)
+    if prev is not None:
+        run_groups.append((prev, rpr_b, "".join(acc)))
+
+    first_run = run_groups[0][0]
+    last_run = run_groups[-1][0]
+
+    first_all = [s for s in slots if s.run_el is first_run]
+    before_text = "".join(s.char for s in first_all if s.idx < slot_s)
+    before_rpr = first_all[0].rpr_bytes if first_all else None
+
+    last_all = [s for s in slots if s.run_el is last_run]
+    after_text = "".join(s.char for s in last_all if s.idx >= slot_e)
+    after_rpr = last_all[0].rpr_bytes if last_all else None
+
+    parent = first_run.getparent()
+    children = list(parent)
+    insert_pos = children.index(first_run)
+
+    seen: set[int] = set()
+    for run_el, _, _ in run_groups:
+        if id(run_el) not in seen:
+            parent.remove(run_el)
+            seen.add(id(run_el))
+
+    pos = insert_pos
+    if before_text:
+        parent.insert(pos, _build_run(before_text, before_rpr))
+        pos += 1
+
+    insert_here = pos  # where replacement text should be inserted
+
+    if after_text:
+        parent.insert(pos, _build_run(after_text, after_rpr))
+
+    return parent, insert_here
+
+
 # ── TracksMixin ───────────────────────────────────────────────────────────────
 
 
@@ -457,6 +547,7 @@ class TracksMixin:
         context_before: str = "",
         context_after: str = "",
         ignore_case: bool = False,
+        tracked: bool = True,
     ) -> dict:
         """Insert *text* with ``<w:ins>`` tracked-changes markup.
 
@@ -483,16 +574,7 @@ class TracksMixin:
             )
             last = slots[slot_e - 1]
 
-            # Build w:ins with inherited rPr
-            ins = etree.Element(f"{W}ins")
-            ins.set(f"{W}id", str(cid))
-            ins.set(f"{W}author", author)
-            ins.set(f"{W}date", now)
-            r = etree.SubElement(ins, f"{W}r")
-            if last.rpr_bytes:
-                r.append(etree.fromstring(last.rpr_bytes))
-            t = etree.SubElement(r, f"{W}t")
-            _preserve(t, text)
+            el = _ins_element(text, last.rpr_bytes, cid=cid, author=author, now=now, tracked=tracked)
 
             # Insert after the element that owns the last matched slot
             if last.in_ins is not None:
@@ -510,32 +592,26 @@ class TracksMixin:
                     if t_el is not None:
                         _preserve(t_el, before_chars)
                     after_run = _build_run(after_chars, last.rpr_bytes)
-                    last.run_el.addnext(ins)
-                    ins.addnext(after_run)
+                    last.run_el.addnext(el)
+                    el.addnext(after_run)
                     self._mark("word/document.xml")
                     return {"change_id": cid, "type": "insertion", "author": author, "date": now}
 
-            anchor.addnext(ins)
+            anchor.addnext(el)
             self._mark("word/document.xml")
             return {"change_id": cid, "type": "insertion", "author": author, "date": now}
 
         # ── Legacy position-based insertion ───────────────────────────────
-        ins = etree.Element(f"{W}ins")
-        ins.set(f"{W}id", str(cid))
-        ins.set(f"{W}author", author)
-        ins.set(f"{W}date", now)
-        r = etree.SubElement(ins, f"{W}r")
-        t = etree.SubElement(r, f"{W}t")
-        _preserve(t, text)
+        el = _ins_element(text, None, cid=cid, author=author, now=now, tracked=tracked)
 
         if position == "start":
             ppr = para.find(f"{W}pPr")
             if ppr is not None:
-                ppr.addnext(ins)
+                ppr.addnext(el)
             else:
-                para.insert(0, ins)
+                para.insert(0, el)
         elif position == "end":
-            para.append(ins)
+            para.append(el)
         else:
             placed = False
             for run_el in list(para.findall(f"{W}r")):
@@ -551,10 +627,10 @@ class TracksMixin:
                     rpr_bytes = etree.tostring(rpr) if rpr is not None else None
                     _preserve(t_el, full[:end])
                     after_run = self._make_run(full[end:], rpr_bytes)
-                    run_el.addnext(ins)
-                    ins.addnext(after_run)
+                    run_el.addnext(el)
+                    el.addnext(after_run)
                 else:
-                    run_el.addnext(ins)
+                    run_el.addnext(el)
                 placed = True
                 break
 
@@ -562,12 +638,12 @@ class TracksMixin:
                 for del_el in para.findall(f"{W}del"):
                     del_text = "".join(t.text for t in del_el.iter(f"{W}delText") if t.text)
                     if position in del_text:
-                        del_el.addnext(ins)
+                        del_el.addnext(el)
                         placed = True
                         break
 
             if not placed:
-                para.append(ins)
+                para.append(el)
 
         self._mark("word/document.xml")
         return {"change_id": cid, "type": "insertion", "author": author, "date": now}
@@ -583,8 +659,9 @@ class TracksMixin:
         context_before: str = "",
         context_after: str = "",
         ignore_case: bool = False,
+        tracked: bool = True,
     ) -> dict:
-        """Mark *text* as deleted with ``<w:del>`` tracked-changes markup."""
+        """Mark *text* as deleted with ``<w:del>`` markup, or remove directly when tracked=False."""
         doc = self._require("word/document.xml")
         para = self._find_para(doc, para_id)
         if para is None:
@@ -596,9 +673,12 @@ class TracksMixin:
         slot_s, slot_e, slots = _resolve(
             doc, para, text, context_before, context_after, ignore_case=ignore_case
         )
-        _apply_deletion(para, slot_s, slot_e, slots, cid, author, now)
+        if tracked:
+            _apply_deletion(para, slot_s, slot_e, slots, cid, author, now)
+        else:
+            _apply_untracked_deletion(para, slot_s, slot_e, slots)
         self._mark("word/document.xml")
-        return {"change_id": cid, "type": "deletion", "author": author, "date": now}
+        return {"change_id": cid if tracked else None, "type": "deletion", "author": author, "date": now}
 
     # ── replace_text ────────────────────────────────────────────────────────
 
@@ -612,6 +692,7 @@ class TracksMixin:
         context_before: str = "",
         context_after: str = "",
         ignore_case: bool = False,
+        tracked: bool = True,
     ) -> dict:
         """Replace *find* with *replace* using tracked changes (del + ins).
 
@@ -650,37 +731,43 @@ class TracksMixin:
         now = _now_iso()
         ins_cid: int | None = None
 
-        if del_text:
-            _apply_deletion(para, real_slot_s, real_slot_e, slots, cid, author, now)
-            # Refresh slots after deletion mutated the tree
-            slots = _flatten_para(para)
-            # Find the w:del we just inserted and insert w:ins after it
-            del_els = list(para.iter(f"{W}del"))
-            last_del = del_els[-1] if del_els else None
+        if tracked:
+            if del_text:
+                _apply_deletion(para, real_slot_s, real_slot_e, slots, cid, author, now)
+                # Refresh slots after deletion mutated the tree
+                slots = _flatten_para(para)
+                del_els = list(para.iter(f"{W}del"))
+                last_del = del_els[-1] if del_els else None
 
-        if ins_text:
-            ins_cid = self._next_markup_id(doc)
-            ins_el = etree.Element(f"{W}ins")
-            ins_el.set(f"{W}id", str(ins_cid))
-            ins_el.set(f"{W}author", author)
-            ins_el.set(f"{W}date", now)
-            # Inherit rPr from the run at the insert point (first slot of del range)
+            if ins_text:
+                ins_cid = self._next_markup_id(doc)
+                ins_el = etree.Element(f"{W}ins")
+                ins_el.set(f"{W}id", str(ins_cid))
+                ins_el.set(f"{W}author", author)
+                ins_el.set(f"{W}date", now)
+                rpr_bytes = slots[real_slot_s].rpr_bytes if real_slot_s < len(slots) else None
+                r = etree.SubElement(ins_el, f"{W}r")
+                if rpr_bytes:
+                    r.append(etree.fromstring(rpr_bytes))
+                t = etree.SubElement(r, f"{W}t")
+                _preserve(t, ins_text)
+                if del_text and last_del is not None:
+                    last_del.addnext(ins_el)
+                else:
+                    para.append(ins_el)
+        else:
             rpr_bytes = slots[real_slot_s].rpr_bytes if real_slot_s < len(slots) else None
-            r = etree.SubElement(ins_el, f"{W}r")
-            if rpr_bytes:
-                r.append(etree.fromstring(rpr_bytes))
-            t = etree.SubElement(r, f"{W}t")
-            _preserve(t, ins_text)
-            if del_text and last_del is not None:
-                last_del.addnext(ins_el)
-            else:
-                # Pure insertion (no deletion)
-                para.append(ins_el)
+            parent = para
+            insert_pos = real_slot_s
+            if del_text:
+                parent, insert_pos = _apply_untracked_deletion(para, real_slot_s, real_slot_e, slots)
+            if ins_text:
+                parent.insert(insert_pos, _build_run(ins_text, rpr_bytes))
 
         self._mark("word/document.xml")
         return {
-            "del_id": cid if del_text else None,
-            "ins_id": ins_cid if ins_text else None,
+            "del_id": cid if (tracked and del_text) else None,
+            "ins_id": ins_cid if (tracked and ins_text) else None,
             "type": "replacement",
             "author": author,
             "date": now,

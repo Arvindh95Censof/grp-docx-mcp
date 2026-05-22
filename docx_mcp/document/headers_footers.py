@@ -34,6 +34,7 @@ class HeadersFootersMixin:
         new_text: str,
         *,
         author: str = "Claude",
+        tracked: bool = True,
     ) -> dict:
         """Edit text in a header or footer with tracked changes.
 
@@ -80,34 +81,41 @@ class HeadersFootersMixin:
                 parent.insert(insert_at, before)
                 insert_at += 1
 
-            # Deletion
-            cid = self._next_markup_id(tree)
-            del_el = etree.Element(f"{W}del")
-            del_el.set(f"{W}id", str(cid))
-            del_el.set(f"{W}author", author)
-            del_el.set(f"{W}date", now)
-            del_run = etree.SubElement(del_el, f"{W}r")
-            if rpr_bytes:
-                del_run.append(etree.fromstring(rpr_bytes))
-            dt = etree.SubElement(del_run, f"{W}delText")
-            _preserve(dt, old_text)
-            parent.insert(insert_at, del_el)
-            insert_at += 1
-            changes += 1
+            if tracked:
+                # Deletion markup
+                cid = self._next_markup_id(tree)
+                del_el = etree.Element(f"{W}del")
+                del_el.set(f"{W}id", str(cid))
+                del_el.set(f"{W}author", author)
+                del_el.set(f"{W}date", now)
+                del_run = etree.SubElement(del_el, f"{W}r")
+                if rpr_bytes:
+                    del_run.append(etree.fromstring(rpr_bytes))
+                dt = etree.SubElement(del_run, f"{W}delText")
+                _preserve(dt, old_text)
+                parent.insert(insert_at, del_el)
+                insert_at += 1
 
-            # Insertion
-            cid = self._next_markup_id(tree)
-            ins_el = etree.Element(f"{W}ins")
-            ins_el.set(f"{W}id", str(cid))
-            ins_el.set(f"{W}author", author)
-            ins_el.set(f"{W}date", now)
-            ins_run = etree.SubElement(ins_el, f"{W}r")
-            if rpr_bytes:
-                ins_run.append(etree.fromstring(rpr_bytes))
-            ins_t = etree.SubElement(ins_run, f"{W}t")
-            _preserve(ins_t, new_text)
-            parent.insert(insert_at, ins_el)
-            insert_at += 1
+                # Insertion markup
+                cid = self._next_markup_id(tree)
+                ins_el = etree.Element(f"{W}ins")
+                ins_el.set(f"{W}id", str(cid))
+                ins_el.set(f"{W}author", author)
+                ins_el.set(f"{W}date", now)
+                ins_run = etree.SubElement(ins_el, f"{W}r")
+                if rpr_bytes:
+                    ins_run.append(etree.fromstring(rpr_bytes))
+                ins_t = etree.SubElement(ins_run, f"{W}t")
+                _preserve(ins_t, new_text)
+                parent.insert(insert_at, ins_el)
+                insert_at += 1
+            else:
+                # Direct replacement — plain run with new text
+                new_run = self._make_run(new_text, rpr_bytes)
+                parent.insert(insert_at, new_run)
+                insert_at += 1
+
+            changes += 1
 
             # Text after
             end = idx + len(old_text)

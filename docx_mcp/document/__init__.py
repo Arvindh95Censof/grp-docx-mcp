@@ -25,6 +25,7 @@ from .base import (
 from .bookmarks import BookmarksMixin
 from .captions import CaptionMixin
 from .charts import ChartsMixin
+from .changesummary import ChangeSummaryMixin
 from .clausediff import ClauseDiffMixin
 from .comments import CommentsMixin
 from .compare import CompareMixin
@@ -77,6 +78,7 @@ class DocxDocument(
     TracksMixin,
     RevisionsMixin,
     FormattingMixin,
+    ChangeSummaryMixin,
     CommentsMixin,
     FootnotesMixin,
     ValidationMixin,

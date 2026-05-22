@@ -97,6 +97,6 @@ class TestDiffToText:
         revised = _make_doc(tmp_path, "revised.docx", ["Revised text here"])
         result = DocxDocument.diff_to_text(base, revised)
         content = open(result["text_path"]).read()
-        # Must have at least one change marker and the changed text
         assert len(content.strip()) > 0
-        assert "text" in content.lower()  # some fragment of the changed content
+        # Word-level diff: "Original" is tracked; "text here" is the equal unchanged part.
+        assert "Original" in content or "Revised" in content or "replacement" in content.lower()

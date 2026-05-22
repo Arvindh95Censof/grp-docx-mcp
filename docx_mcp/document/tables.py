@@ -115,8 +115,9 @@ class TablesMixin:
         text: str,
         *,
         author: str = "Claude",
+        tracked: bool = True,
     ) -> dict:
-        """Modify a table cell with tracked changes.
+        """Modify a table cell, with tracked changes by default.
 
         Args:
             table_idx: Table index (0-based).
@@ -124,6 +125,7 @@ class TablesMixin:
             col: Column index (0-based).
             text: New cell text.
             author: Author name for the revision.
+            tracked: When False, overwrite cell text directly without w:del/w:ins markup.
         """
         tbl = self._get_table(table_idx)
         doc = self._require("word/document.xml")
@@ -145,36 +147,44 @@ class TablesMixin:
             para.set(f"{W14}paraId", self._new_para_id())
             para.set(f"{W14}textId", "77777777")
 
-        # Delete existing runs
-        for run_el in list(para.findall(f"{W}r")):
-            t_el = run_el.find(f"{W}t")
-            if t_el is None or not t_el.text:
-                continue
-            rpr = run_el.find(f"{W}rPr")
-            rpr_bytes = etree.tostring(rpr) if rpr is not None else None
-            parent = run_el.getparent()
-            pos = list(parent).index(run_el)
-            parent.remove(run_el)
-            del_el = etree.Element(f"{W}del")
-            del_el.set(f"{W}id", str(cid))
-            del_el.set(f"{W}author", author)
-            del_el.set(f"{W}date", now)
-            del_run = etree.SubElement(del_el, f"{W}r")
-            if rpr_bytes:
-                del_run.append(etree.fromstring(rpr_bytes))
-            dt = etree.SubElement(del_run, f"{W}delText")
-            _preserve(dt, t_el.text)
-            parent.insert(pos, del_el)
-            cid = self._next_markup_id(doc)
+        if tracked:
+            # Delete existing runs as w:del
+            for run_el in list(para.findall(f"{W}r")):
+                t_el = run_el.find(f"{W}t")
+                if t_el is None or not t_el.text:
+                    continue
+                rpr = run_el.find(f"{W}rPr")
+                rpr_bytes = etree.tostring(rpr) if rpr is not None else None
+                parent = run_el.getparent()
+                pos = list(parent).index(run_el)
+                parent.remove(run_el)
+                del_el = etree.Element(f"{W}del")
+                del_el.set(f"{W}id", str(cid))
+                del_el.set(f"{W}author", author)
+                del_el.set(f"{W}date", now)
+                del_run = etree.SubElement(del_el, f"{W}r")
+                if rpr_bytes:
+                    del_run.append(etree.fromstring(rpr_bytes))
+                dt = etree.SubElement(del_run, f"{W}delText")
+                _preserve(dt, t_el.text)
+                parent.insert(pos, del_el)
+                cid = self._next_markup_id(doc)
 
-        # Insert new text
-        ins = etree.SubElement(para, f"{W}ins")
-        ins.set(f"{W}id", str(cid))
-        ins.set(f"{W}author", author)
-        ins.set(f"{W}date", now)
-        r = etree.SubElement(ins, f"{W}r")
-        t = etree.SubElement(r, f"{W}t")
-        _preserve(t, text)
+            # Insert new text as w:ins
+            ins = etree.SubElement(para, f"{W}ins")
+            ins.set(f"{W}id", str(cid))
+            ins.set(f"{W}author", author)
+            ins.set(f"{W}date", now)
+            r = etree.SubElement(ins, f"{W}r")
+            t = etree.SubElement(r, f"{W}t")
+            _preserve(t, text)
+        else:
+            # Direct overwrite: remove existing runs, insert plain w:r
+            for run_el in list(para.findall(f"{W}r")):
+                para.remove(run_el)
+            r = etree.SubElement(para, f"{W}r")
+            t = etree.SubElement(r, f"{W}t")
+            _preserve(t, text)
 
         self._mark("word/document.xml")
         return {"modified": True, "table_index": table_idx, "cell": [row, col], "text": text}

@@ -149,6 +149,63 @@ def _word_diff_para(
     return children, cid
 
 
+def _collect_diff_changes(root: etree._Element) -> list[dict]:
+    """Walk a tracked-change document tree and collect change events."""
+    changes: list[dict] = []
+    i = 0
+    children = list(root.iter())
+    while i < len(children):
+        el = children[i]
+        if el.tag == _wt("del"):
+            parent = el.getparent()
+            if parent is not None:
+                siblings = list(parent)
+                idx = siblings.index(el)
+                if idx + 1 < len(siblings) and siblings[idx + 1].tag == _wt("ins"):
+                    ins_el = siblings[idx + 1]
+                    old = "".join(t.text or "" for t in el.iter(_wt("delText")))
+                    new = "".join(t.text or "" for t in ins_el.iter(_wt("t")))
+                    if old or new:
+                        changes.append({"type": "replacement", "old": old, "new": new})
+                    i += 1
+                else:
+                    text = "".join(t.text or "" for t in el.iter(_wt("delText")))
+                    if text:
+                        changes.append({"type": "deletion", "text": text})
+        elif el.tag == _wt("ins"):
+            parent = el.getparent()
+            if parent is not None:
+                siblings = list(parent)
+                idx = siblings.index(el)
+                if idx > 0 and siblings[idx - 1].tag == _wt("del"):
+                    pass  # already handled as replacement
+                else:
+                    text = "".join(t.text or "" for t in el.iter(_wt("t")))
+                    if text:
+                        changes.append({"type": "insertion", "text": text})
+        i += 1
+    return changes
+
+
+def _render_diff_summary(changes: list[dict]) -> str:
+    lines = ["Document Diff Summary", "=" * 40, ""]
+    if not changes:
+        lines.append("No changes detected.")
+        return "\n".join(lines)
+    for n, ch in enumerate(changes, 1):
+        kind = ch["type"].upper()
+        lines.append(f"{n}. {kind}")
+        if kind == "REPLACEMENT":
+            lines.append(f'   Old: "{ch["old"]}"')
+            lines.append(f'   New: "{ch["new"]}"')
+        elif kind == "INSERTION":
+            lines.append(f'   Added: "{ch["text"]}"')
+        elif kind == "DELETION":
+            lines.append(f'   Removed: "{ch["text"]}"')
+        lines.append("")
+    return "\n".join(lines)
+
+
 class CompareMixin:
     """Compare two DOCX files and produce tracked-change output."""
 
@@ -258,3 +315,47 @@ class CompareMixin:
                 )
 
         return {"path": output_path}
+
+    @staticmethod
+    def diff_to_text(
+        base_path: str,
+        revised_path: str,
+        *,
+        docx_output: str = "",
+        text_output: str = "",
+    ) -> dict:
+        """Compare two DOCX files and produce a tracked-change DOCX + plain-text summary.
+
+        Calls :meth:`compare_documents` for the DOCX half, then walks the
+        resulting tracked-change tree to render an email-ready ``.txt`` file.
+
+        Args:
+            base_path: Path to the original document.
+            revised_path: Path to the revised document.
+            docx_output: Output path for the tracked-change DOCX (auto-generated if empty).
+            text_output: Output path for the plain-text summary (auto-generated if empty).
+
+        Returns:
+            ``{"docx_path": str, "text_path": str, "change_count": int}``
+        """
+        # Auto-generate output paths from base stem
+        if not docx_output:
+            base_p = Path(base_path)
+            docx_output = str(base_p.parent / (base_p.stem + "_compared.docx"))
+        if not text_output:
+            base_p = Path(base_path)
+            text_output = str(base_p.parent / (base_p.stem + "_changes.txt"))
+
+        CompareMixin.compare_documents(base_path, revised_path, docx_output)
+
+        # Extract changes from the produced DOCX
+        compared_root = _parse_doc_root(docx_output)
+        changes = _collect_diff_changes(compared_root)
+        summary = _render_diff_summary(changes)
+        Path(text_output).write_text(summary, encoding="utf-8")
+
+        return {
+            "docx_path": docx_output,
+            "text_path": text_output,
+            "change_count": len(changes),
+        }

@@ -133,7 +133,9 @@ class TestModifyCellUntracked:
         src = f"{FIXTURES}/mammoth_tables.docx"
         dest = str(tmp_path / "table.docx")
         shutil.copy(src, dest)
-        return DocxDocument.open(dest)
+        doc = DocxDocument(dest)
+        doc.open()
+        return doc
 
     def test_no_tracked_markup(self, tmp_path):
         doc = self._doc_with_table(tmp_path)
@@ -167,7 +169,9 @@ class TestEditHeaderFooterUntracked:
         src = f"{FIXTURES}/poi_header_footer.docx"
         dest = str(tmp_path / "hf.docx")
         shutil.copy(src, dest)
-        return DocxDocument.open(dest)
+        doc = DocxDocument(dest)
+        doc.open()
+        return doc
 
     def test_no_tracked_markup(self, tmp_path):
         doc = self._doc_with_header(tmp_path)
