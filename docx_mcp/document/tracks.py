@@ -574,7 +574,9 @@ class TracksMixin:
             )
             last = slots[slot_e - 1]
 
-            el = _ins_element(text, last.rpr_bytes, cid=cid, author=author, now=now, tracked=tracked)
+            el = _ins_element(
+                text, last.rpr_bytes, cid=cid, author=author, now=now, tracked=tracked
+            )
 
             # Insert after the element that owns the last matched slot
             if last.in_ins is not None:
@@ -678,7 +680,12 @@ class TracksMixin:
         else:
             _apply_untracked_deletion(para, slot_s, slot_e, slots)
         self._mark("word/document.xml")
-        return {"change_id": cid if tracked else None, "type": "deletion", "author": author, "date": now}
+        return {
+            "change_id": cid if tracked else None,
+            "type": "deletion",
+            "author": author,
+            "date": now,
+        }
 
     # ── replace_text ────────────────────────────────────────────────────────
 
@@ -760,7 +767,9 @@ class TracksMixin:
             parent = para
             insert_pos = real_slot_s
             if del_text:
-                parent, insert_pos = _apply_untracked_deletion(para, real_slot_s, real_slot_e, slots)
+                parent, insert_pos = _apply_untracked_deletion(
+                    para, real_slot_s, real_slot_e, slots
+                )
             if ins_text:
                 parent.insert(insert_pos, _build_run(ins_text, rpr_bytes))
 

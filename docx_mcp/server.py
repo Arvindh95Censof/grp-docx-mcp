@@ -279,11 +279,16 @@ def modify_cell(
     col: int,
     text: str,
     author: str = "Claude",
+    tracked: bool = True,
     document_handle: str = "",
 ) -> str:
-    """Modify a table cell with tracked changes (delete old, insert new)."""
+    """Modify a table cell, with tracked changes by default.
+
+    Args:
+        tracked: When False, overwrite the cell text directly without w:del/w:ins markup.
+    """
     _, doc = _resolve(document_handle)
-    return _js(doc.modify_cell(table_idx, row, col, text, author=author))
+    return _js(doc.modify_cell(table_idx, row, col, text, author=author, tracked=tracked))
 
 
 @mcp.tool()
@@ -557,11 +562,16 @@ def edit_header_footer(
     old_text: str,
     new_text: str,
     author: str = "Claude",
+    tracked: bool = True,
     document_handle: str = "",
 ) -> str:
-    """Edit text in a header or footer with tracked changes."""
+    """Edit text in a header or footer.
+
+    Args:
+        tracked: When False, replace text directly without w:del/w:ins markup.
+    """
     _, doc = _resolve(document_handle)
-    return _js(doc.edit_header_footer(location, old_text, new_text, author=author))
+    return _js(doc.edit_header_footer(location, old_text, new_text, author=author, tracked=tracked))
 
 
 @mcp.tool()
@@ -1114,9 +1124,10 @@ def insert_text(
     context_before: str = "",
     context_after: str = "",
     ignore_case: bool = False,
+    tracked: bool = True,
     document_handle: str = "",
 ) -> str:
-    """Insert text with Word track-changes markup.
+    """Insert text into a paragraph.
 
     Args:
         para_id: paraId of the target paragraph.
@@ -1126,6 +1137,7 @@ def insert_text(
         context_before: Text immediately before the insertion point (for precise anchoring).
         context_after: Text immediately after the insertion point (for precise anchoring).
         ignore_case: If True, match context_before/context_after case-insensitively.
+        tracked: When False, insert text directly without w:ins markup.
         document_handle: Optional handle for concurrent session isolation.
     """
     _, doc = _resolve(document_handle)
@@ -1138,6 +1150,7 @@ def insert_text(
             context_before=context_before,
             context_after=context_after,
             ignore_case=ignore_case,
+            tracked=tracked,
         )
     )
 
@@ -1150,21 +1163,25 @@ def delete_text(
     context_before: str = "",
     context_after: str = "",
     ignore_case: bool = False,
+    tracked: bool = True,
     document_handle: str = "",
 ) -> str:
-    """Mark text as deleted with Word track-changes markup (appears as red strikethrough in Word).
+    """Delete text from a paragraph.
 
-    Finds the text within the paragraph (across run boundaries if needed) and wraps it in
-    deletion markup. Provide context_before/context_after to disambiguate when the same text
+    Finds the text within the paragraph (across run boundaries if needed).
+    With tracked=True (default) the text appears as red strikethrough in Word.
+    With tracked=False the text is removed directly.
+    Provide context_before/context_after to disambiguate when the same text
     appears multiple times, or when the text contains smart quotes / special whitespace.
 
     Args:
         para_id: paraId of the target paragraph.
-        text: Text to mark as deleted (ASCII quotes/dashes/spaces match their Unicode equivalents).
+        text: Text to delete (ASCII quotes/dashes/spaces match their Unicode equivalents).
         author: Author name for the revision.
         context_before: Text immediately before the target (for precise anchoring).
         context_after: Text immediately after the target (for precise anchoring).
-        ignore_case: If True, match text and context case-insensitively (output preserves original casing).  # noqa: E501
+        ignore_case: If True, match text and context case-insensitively.
+        tracked: When False, remove text directly without w:del markup.
         document_handle: Optional handle for concurrent session isolation.
     """
     _, doc = _resolve(document_handle)
@@ -1176,6 +1193,7 @@ def delete_text(
             context_before=context_before,
             context_after=context_after,
             ignore_case=ignore_case,
+            tracked=tracked,
         )
     )
 
@@ -1189,12 +1207,14 @@ def replace_text(
     context_before: str = "",
     context_after: str = "",
     ignore_case: bool = False,
+    tracked: bool = True,
     document_handle: str = "",
 ) -> str:
-    """Replace text with tracked changes markup (deletion + insertion).
+    """Replace text in a paragraph.
 
-    Only the actually-changed portion is marked; common leading/trailing text is
-    left as plain runs (collapseDiff behaviour).
+    With tracked=True (default) only the actually-changed portion is marked as
+    deletion + insertion; common leading/trailing text is left as plain runs.
+    With tracked=False the replacement is applied directly without any markup.
 
     Args:
         para_id: paraId of the target paragraph.
@@ -1203,6 +1223,7 @@ def replace_text(
         author: Author name for the revision.
         context_before: Text immediately before the target (for precise anchoring).
         context_after: Text immediately after the target (for precise anchoring).
+        tracked: When False, replace text directly without w:del/w:ins markup.
         document_handle: Optional handle for concurrent session isolation.
     """
     _, doc = _resolve(document_handle)
@@ -1215,6 +1236,7 @@ def replace_text(
             context_before=context_before,
             context_after=context_after,
             ignore_case=ignore_case,
+            tracked=tracked,
         )
     )
 
@@ -1511,6 +1533,53 @@ def compare_documents(
         output_path: Destination path. Auto-generated if empty.
     """
     return _js(DocxDocument.compare_documents(base_path, revised_path, output_path))
+
+
+@mcp.tool()
+def diff_to_text(
+    base_path: str,
+    revised_path: str,
+    docx_output: str = "",
+    text_output: str = "",
+) -> str:
+    """Compare two DOCX files and produce a tracked-change DOCX plus a plain-text summary.
+
+    Combines compare_documents (for the DOCX half) with a plain-text change log
+    suitable for pasting into an email or commit message.
+
+    Args:
+        base_path: Path to the original DOCX.
+        revised_path: Path to the revised DOCX.
+        docx_output: Output path for the tracked-change DOCX (auto-generated if empty).
+        text_output: Output path for the plain-text summary .txt (auto-generated if empty).
+    """
+    return _js(
+        DocxDocument.diff_to_text(
+            base_path,
+            revised_path,
+            docx_output=docx_output,
+            text_output=text_output,
+        )
+    )
+
+
+@mcp.tool()
+def generate_change_summary(
+    output_path: str = "",
+    document_handle: str = "",
+) -> str:
+    """Scan tracked changes in the open document and write an email-ready .txt summary.
+
+    Reads w:ins and w:del elements from the current document, groups adjacent
+    del+ins pairs as REPLACEMENT entries, and writes a numbered list with
+    author, date, and content per change.
+
+    Args:
+        output_path: Destination .txt path. Auto-generated from the document stem if empty.
+        document_handle: Optional handle for concurrent session isolation.
+    """
+    _, doc = _resolve(document_handle)
+    return _js(doc.generate_change_summary(output_path))
 
 
 @mcp.tool()
