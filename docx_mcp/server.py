@@ -282,10 +282,20 @@ def modify_cell(
     tracked: bool = True,
     document_handle: str = "",
 ) -> str:
-    """Modify a table cell, with tracked changes by default.
+    """Modify a table cell.
+
+    By default (tracked=True) the old content is marked as a deletion and the new
+    content as an insertion — the human reviewer accepts/rejects in Word's Track
+    Changes view. Pass tracked=False to overwrite the cell directly with no markup.
 
     Args:
-        tracked: When False, overwrite the cell text directly without w:del/w:ins markup.
+        table_idx: Table index (0-based).
+        row: Row index (0-based).
+        col: Column index (0-based).
+        text: New cell text.
+        author: Author name shown in Word's review pane (tracked=True only).
+        tracked: True (default) = tracked del+ins. False = direct overwrite, no markup.
+        document_handle: Optional handle for concurrent session isolation.
     """
     _, doc = _resolve(document_handle)
     return _js(doc.modify_cell(table_idx, row, col, text, author=author, tracked=tracked))
@@ -567,8 +577,17 @@ def edit_header_footer(
 ) -> str:
     """Edit text in a header or footer.
 
+    By default (tracked=True) the change is recorded as a deletion of the old text
+    and an insertion of the new text — the human reviewer accepts/rejects in Word.
+    Pass tracked=False to replace the text directly with no revision markup.
+
     Args:
-        tracked: When False, replace text directly without w:del/w:ins markup.
+        location: "header" or "footer" (matches the first found of that type).
+        old_text: Text to find and replace.
+        new_text: Replacement text.
+        author: Author name shown in Word's review pane (tracked=True only).
+        tracked: True (default) = tracked del+ins. False = direct replacement, no markup.
+        document_handle: Optional handle for concurrent session isolation.
     """
     _, doc = _resolve(document_handle)
     return _js(doc.edit_header_footer(location, old_text, new_text, author=author, tracked=tracked))
@@ -1129,15 +1148,21 @@ def insert_text(
 ) -> str:
     """Insert text into a paragraph.
 
+    By default (tracked=True) the insertion is marked as a proposed addition
+    that appears underlined in Word's Track Changes view. The human reviewer
+    must accept it in Word before it becomes permanent. Pass tracked=False to
+    write the text directly with no revision markup.
+
     Args:
         para_id: paraId of the target paragraph.
         text: Text to insert.
         position: Where to insert — "start", "end", or a substring to insert after.
-        author: Author name for the revision (shown in Word's review pane).
+        author: Author name shown in Word's review pane (tracked=True only).
         context_before: Text immediately before the insertion point (for precise anchoring).
         context_after: Text immediately after the insertion point (for precise anchoring).
         ignore_case: If True, match context_before/context_after case-insensitively.
-        tracked: When False, insert text directly without w:ins markup.
+        tracked: True (default) = revision markup the human accepts/rejects in Word.
+                 False = text written directly, no markup.
         document_handle: Optional handle for concurrent session isolation.
     """
     _, doc = _resolve(document_handle)
@@ -1169,19 +1194,22 @@ def delete_text(
     """Delete text from a paragraph.
 
     Finds the text within the paragraph (across run boundaries if needed).
-    With tracked=True (default) the text appears as red strikethrough in Word.
-    With tracked=False the text is removed directly.
+    With tracked=True (default) the deleted text stays visible as red strikethrough
+    in Word's Track Changes view — the human reviewer must accept the deletion to
+    remove it permanently. With tracked=False the text is removed immediately.
+
     Provide context_before/context_after to disambiguate when the same text
-    appears multiple times, or when the text contains smart quotes / special whitespace.
+    appears multiple times, or when it contains smart quotes / special whitespace.
 
     Args:
         para_id: paraId of the target paragraph.
         text: Text to delete (ASCII quotes/dashes/spaces match their Unicode equivalents).
-        author: Author name for the revision.
+        author: Author name shown in Word's review pane (tracked=True only).
         context_before: Text immediately before the target (for precise anchoring).
         context_after: Text immediately after the target (for precise anchoring).
         ignore_case: If True, match text and context case-insensitively.
-        tracked: When False, remove text directly without w:del markup.
+        tracked: True (default) = red strikethrough the human accepts/rejects.
+                 False = text removed immediately, no markup.
         document_handle: Optional handle for concurrent session isolation.
     """
     _, doc = _resolve(document_handle)
@@ -1212,18 +1240,21 @@ def replace_text(
 ) -> str:
     """Replace text in a paragraph.
 
-    With tracked=True (default) only the actually-changed portion is marked as
-    deletion + insertion; common leading/trailing text is left as plain runs.
-    With tracked=False the replacement is applied directly without any markup.
+    With tracked=True (default) the old text is shown as red strikethrough and the
+    new text as an underlined insertion — the human reviewer accepts/rejects in Word.
+    Only the actually-changed portion is marked; common leading/trailing text is left
+    as plain runs. With tracked=False the replacement is applied immediately without
+    any visible markup.
 
     Args:
         para_id: paraId of the target paragraph.
         find: Text to find and replace (may span run boundaries).
         replace: Replacement text.
-        author: Author name for the revision.
+        author: Author name shown in Word's review pane (tracked=True only).
         context_before: Text immediately before the target (for precise anchoring).
         context_after: Text immediately after the target (for precise anchoring).
-        tracked: When False, replace text directly without w:del/w:ins markup.
+        tracked: True (default) = strikethrough + underline the human accepts/rejects.
+                 False = replaced immediately, no markup.
         document_handle: Optional handle for concurrent session isolation.
     """
     _, doc = _resolve(document_handle)
@@ -1542,10 +1573,15 @@ def diff_to_text(
     docx_output: str = "",
     text_output: str = "",
 ) -> str:
-    """Compare two DOCX files and produce a tracked-change DOCX plus a plain-text summary.
+    """Compare two separate DOCX files and produce a tracked-change DOCX plus a plain-text summary.
 
-    Combines compare_documents (for the DOCX half) with a plain-text change log
-    suitable for pasting into an email or commit message.
+    Use this when you have two distinct files (e.g. an original and a revised copy)
+    and want to show what changed between them. Produces:
+      1. A DOCX with tracked-change markup (deletions in red, insertions underlined).
+      2. A .txt summary suitable for pasting into an email or pull-request description.
+
+    If you have already made tracked edits to the currently open document and just
+    want to summarise those changes, use generate_change_summary instead.
 
     Args:
         base_path: Path to the original DOCX.
@@ -1568,11 +1604,18 @@ def generate_change_summary(
     output_path: str = "",
     document_handle: str = "",
 ) -> str:
-    """Scan tracked changes in the open document and write an email-ready .txt summary.
+    """Summarise tracked changes already present in the open document as an email-ready .txt.
 
-    Reads w:ins and w:del elements from the current document, groups adjacent
-    del+ins pairs as REPLACEMENT entries, and writes a numbered list with
-    author, date, and content per change.
+    Use this after making edits with tracked=True (the default) and saving, to produce
+    a human-readable change log of what was modified. Reads the document's existing
+    w:ins / w:del elements, groups adjacent deletion+insertion pairs as REPLACEMENT
+    entries, and writes a numbered list with author, date, and text per change.
+
+    Typical workflow:
+      open_document → edit with tracked=True → save_document → generate_change_summary
+
+    If you have two separate files to compare rather than an already-edited document,
+    use diff_to_text instead.
 
     Args:
         output_path: Destination .txt path. Auto-generated from the document stem if empty.
