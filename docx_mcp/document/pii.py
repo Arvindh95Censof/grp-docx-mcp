@@ -41,13 +41,13 @@ def _next_drawing_id(doc_tree: etree._Element, _used: set[int] | None = None) ->
 # Lazy singleton — loading AnalyzerEngine instantiates spaCy (expensive once)
 _analyzer = None  # lazy-loaded on first scrub_pii call
 
-_MODEL_NAME = "en_core_web_trf"
+_MODEL_NAME = "en_core_web_lg"
 
 
 def _get_analyzer():
-    """Lazy-load Presidio AnalyzerEngine with en_core_web_trf.
+    """Lazy-load Presidio AnalyzerEngine with en_core_web_lg.
 
-    On first call, downloads en_core_web_trf (~430MB) if not already installed.
+    On first call, downloads en_core_web_lg (~560MB) if not already installed.
     Download is one-time; cached in the spaCy data directory.
     """
     global _analyzer
@@ -58,14 +58,14 @@ def _get_analyzer():
     from presidio_analyzer import AnalyzerEngine
     from presidio_analyzer.nlp_engine import NlpEngineProvider
 
-    # Auto-download the transformer model on first use if not installed
+    # Auto-download the model on first use if not installed
     try:
         spacy.load(_MODEL_NAME)
     except OSError:
         import sys
 
         print(
-            f"[docx-mcp] Downloading {_MODEL_NAME} NER model (~430MB, one-time)...",
+            f"[docx-mcp] Downloading {_MODEL_NAME} NER model (~560MB, one-time)...",
             file=sys.stderr,
         )
         from spacy.cli import download as _spacy_download

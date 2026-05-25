@@ -29,20 +29,20 @@ from lxml import etree
 from docx_mcp import server
 
 
-def _trf_model_available() -> bool:
-    """Return True only if spaCy + en_core_web_trf + curated_transformer are all present."""
+def _lg_model_available() -> bool:
+    """Return True only if spaCy + en_core_web_lg are present."""
     try:
         import spacy
 
-        spacy.load("en_core_web_trf")
+        spacy.load("en_core_web_lg")
         return True
     except Exception:
         return False
 
 
 _NEEDS_TRF = pytest.mark.skipif(
-    not _trf_model_available(),
-    reason="en_core_web_trf / spacy-curated-transformers not installed",
+    not _lg_model_available(),
+    reason="en_core_web_lg not installed",
 )
 
 
@@ -457,6 +457,6 @@ class TestAutoDownload:
             patch("presidio_analyzer.nlp_engine.NlpEngineProvider"),
         ):
             pii_mod._get_analyzer()
-            mock_dl.assert_called_once_with("en_core_web_trf")
+            mock_dl.assert_called_once_with("en_core_web_lg")
 
         pii_mod._analyzer = original  # restore
