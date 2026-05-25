@@ -119,6 +119,7 @@ pip install docx-mcp-server
 | **Protection** | Lock documents for tracked-changes-only, read-only, or comments-only with passwords |
 | **Structural audit** | Validate footnotes, headings, bookmarks, images, and internal consistency before delivery |
 | **Watermark removal** | Detect and strip DRAFT watermarks from headers |
+| **PII scrubbing** *(experimental)* | Detect names, emails, phone numbers, SSNs, and more using Presidio + spaCy NER. Produces true XML redaction — original text permanently deleted, replaced with a solid black rectangle. **Not for production use** — see [limitations](#pii-scrubbing-experimental). |
 
 ## Example: Contract Review with Redlines
 
@@ -178,6 +179,35 @@ Returns two files:
 ```
 
 Your markdown findings — headings, tables of affected hosts, code blocks with proof-of-concept output, severity ratings — become a formatted Word document matching the client's template. Smart typography is applied automatically (curly quotes, em dashes, proper ellipses).
+
+## PII Scrubbing (Experimental)
+
+> **This feature is experimental and NOT suitable for production use or as the sole control for privileged, regulated, or legally sensitive documents.**
+
+`scrub_pii` uses Microsoft Presidio with a spaCy NER model (`en_core_web_lg`, ~560 MB, downloaded on first call) to detect and permanently redact personal information. Redacted spans are replaced with solid black DrawingML rectangles — the original text is deleted from the XML, not merely hidden.
+
+**What it detects reliably** (via regex/pattern matching, high confidence):
+- Email addresses, phone numbers, credit card numbers, SSNs, IBANs, IP addresses, US passport numbers
+
+**What it detects statistically** (via NER, will have misses):
+- Person names, organisation names, locations, dates
+
+**Known NER gaps — these will be missed:**
+- Names in ALL-CAPS (common in ledgers, table headers, legal party designations)
+- Single-token names with no surrounding context
+- Non-English names (Arabic, CJK, African name patterns have low recall on this English model)
+- Names embedded in legal boilerplate (`Lender: Jane Doe`, `Authorized Signatory: John Smith`)
+
+**Recommended workflow:**
+
+```
+1. open_document("sensitive.docx")
+2. scrub_pii(dry_run=True)             → review detected entities — check for misses
+3. scrub_pii("sensitive_redacted.docx") → produce redacted copy
+4. open the output in Word and verify manually before sharing
+```
+
+Always treat the output as a first pass requiring human review, not a finished redaction.
 
 ## How It Works
 

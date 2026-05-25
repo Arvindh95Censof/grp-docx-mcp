@@ -1482,15 +1482,26 @@ def scrub_pii(
     also_sanitize_metadata: bool = True,
     redact_authors_as: str = "REDACTED",
 ) -> str:
-    """Detect and permanently redact PII from the open document using Presidio + spaCy NER.
+    """[EXPERIMENTAL] Detect and redact PII from the open document using Presidio + spaCy NER.
 
-    NER model (en_core_web_trf, ~430MB) is downloaded automatically on first use.
+    WARNING: This tool WILL miss PII. It is experimental and NOT suitable for production
+    use or as the sole control for privileged, regulated, or legally sensitive documents.
+    Always run with dry_run=True first and manually review every detected entity before
+    committing a redacted file.
+
+    Known limitations (statistical NER gaps):
+      - Names in ALL-CAPS (ledger headers, table cells) are frequently missed.
+      - Single-token names with no surrounding context are unreliable.
+      - Non-English names (Arabic, CJK, African) have low recall on this English model.
+      - Names embedded in legal boilerplate ("Borrower: Jane Doe") are often skipped.
+
+    NER model (en_core_web_lg, ~560MB) downloads automatically on first use.
 
     Detects: PERSON, EMAIL_ADDRESS, PHONE_NUMBER, CREDIT_CARD, SSN, IP_ADDRESS,
              IBAN_CODE, US_BANK_NUMBER, US_PASSPORT, and more via Presidio.
 
     Redacted text is replaced with a solid black DrawingML rectangle — true XML
-    redaction where the original text is deleted entirely from the OOXML, not
+    redaction where the original text is deleted from the OOXML entirely, not
     merely hidden by formatting.
 
     Args:

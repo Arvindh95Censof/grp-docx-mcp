@@ -222,6 +222,25 @@ All five editing tools default to `tracked=True`. Pass `tracked=False` to any of
 | `remove_watermark` | Remove DRAFT watermarks | — |
 | `audit_document` | Full structural audit | — |
 
+### PII Scrubbing ⚠️ Experimental
+
+| Tool | Purpose | Key args |
+|------|---------|----------|
+| `scrub_pii` | Detect and permanently redact PII (EXPERIMENTAL — see warning) | `output_path`, `dry_run`, `entities`, `confidence_threshold` |
+| `sanitize_metadata` | Strip author/session metadata from document properties | `output_path`, `level` |
+
+**WARNING: `scrub_pii` is experimental and NOT suitable for production use.** It will miss PII. Never use it as the sole control for privileged, regulated, or legally sensitive documents.
+
+Known NER gaps:
+- Names in ALL-CAPS (ledger headers, table cells) — frequently missed
+- Single-token names with no surrounding context — unreliable
+- Non-English names (Arabic, CJK, African) — low recall on this English model
+- Names in legal boilerplate patterns (`Lender: Jane Doe`) — often skipped
+
+Pattern-based detectors (email, phone, SSN, credit card, IBAN) are reliable. The NER gaps apply only to PERSON and similar named-entity types.
+
+Always run `dry_run=True` first and review every detected entity manually before committing a redacted file.
+
 ## Essential Patterns
 
 ### Replace Text
