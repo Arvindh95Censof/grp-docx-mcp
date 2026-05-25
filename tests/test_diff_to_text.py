@@ -7,14 +7,14 @@ These tests fail until implemented.
 from __future__ import annotations
 
 import os
-import shutil
 import uuid
+from pathlib import Path
 
 from lxml import etree
 
-from docx_mcp.document import DocxDocument, W, W14
+from docx_mcp.document import W14, DocxDocument, W
 
-FIXTURES = "/Users/4n6h4x0r/src/docx-mcp/tests/fixtures"
+FIXTURES = Path(__file__).parent / "fixtures"  # noqa: F841 (reserved for future corpus tests)
 
 
 def _make_doc(tmp_path, name: str, paragraphs: list[str]) -> str:
@@ -56,14 +56,14 @@ class TestDiffToText:
         base = _make_doc(tmp_path, "base.docx", ["This paragraph will be deleted"])
         revised = _make_doc(tmp_path, "revised.docx", ["Completely different content"])
         result = DocxDocument.diff_to_text(base, revised)
-        content = open(result["text_path"]).read()
+        content = Path(result["text_path"]).read_text()
         assert "This paragraph will be deleted" in content or "deleted" in content.lower()
 
     def test_inserted_text_in_summary(self, tmp_path):
         base = _make_doc(tmp_path, "base.docx", ["Original paragraph"])
         revised = _make_doc(tmp_path, "revised.docx", ["Original paragraph", "Brand new paragraph"])
         result = DocxDocument.diff_to_text(base, revised)
-        content = open(result["text_path"]).read()
+        content = Path(result["text_path"]).read_text()
         assert "Brand new paragraph" in content
 
     def test_no_changes_produces_zero_count(self, tmp_path):
@@ -96,7 +96,7 @@ class TestDiffToText:
         base = _make_doc(tmp_path, "base.docx", ["Original text here"])
         revised = _make_doc(tmp_path, "revised.docx", ["Revised text here"])
         result = DocxDocument.diff_to_text(base, revised)
-        content = open(result["text_path"]).read()
+        content = Path(result["text_path"]).read_text()
         assert len(content.strip()) > 0
         # Word-level diff: "Original" is tracked; "text here" is the equal unchanged part.
         assert "Original" in content or "Revised" in content or "replacement" in content.lower()

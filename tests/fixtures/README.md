@@ -3,7 +3,7 @@
 Real Word documents sourced externally for correctness validation.
 These are the doer-checker gate — synthetic fixtures alone are insufficient.
 
-## Original fixtures
+## Original corpus documents
 
 - `real_contract.docx` — 50-page multi-section document with TOC, heading styles, headers, footers, and page numbers. Source: https://sample-files.com/downloads/documents/docx/sample-files.com-large-document.docx
 - `real_tracked_changes.docx` — Document with tracked insertions (`w:ins`) and deletions (`w:del`), plus reviewer comments. Source: https://sample-files.com/downloads/documents/docx/sample-files.com-tracked-changes.docx
@@ -60,7 +60,7 @@ Source: https://github.com/mwilliamson/mammoth.js/tree/master/test/test-data
 Source: https://github.com/python-openxml/python-docx/tree/master/tests/test_files
 
 - `pydocx_having_images.docx` — Document with embedded images
-- `pydocx_test.docx` — Basic structure test fixture
+- `pydocx_test.docx` — Basic structure corpus document
 
 ## LibreOffice test suite (Category 2 + 3 — feature-targeted)
 

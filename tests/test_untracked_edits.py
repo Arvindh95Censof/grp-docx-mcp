@@ -9,12 +9,13 @@ from __future__ import annotations
 
 import shutil
 import uuid
+from pathlib import Path
 
 from lxml import etree
 
-from docx_mcp.document import DocxDocument, W, W14
+from docx_mcp.document import W14, DocxDocument, W
 
-FIXTURES = "/Users/4n6h4x0r/src/docx-mcp/tests/fixtures"
+FIXTURES = Path(__file__).parent / "fixtures"
 
 
 def _make_doc(tmp_path):
@@ -130,7 +131,7 @@ class TestReplaceTextUntracked:
 class TestModifyCellUntracked:
     def _doc_with_table(self, tmp_path):
         """Open the mammoth_tables fixture which has a real table."""
-        src = f"{FIXTURES}/mammoth_tables.docx"
+        src = str(FIXTURES / "mammoth_tables.docx")
         dest = str(tmp_path / "table.docx")
         shutil.copy(src, dest)
         doc = DocxDocument(dest)
@@ -166,7 +167,7 @@ class TestModifyCellUntracked:
 
 class TestEditHeaderFooterUntracked:
     def _doc_with_header(self, tmp_path):
-        src = f"{FIXTURES}/poi_header_footer.docx"
+        src = str(FIXTURES / "poi_header_footer.docx")
         dest = str(tmp_path / "hf.docx")
         shutil.copy(src, dest)
         doc = DocxDocument(dest)
