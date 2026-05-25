@@ -7,10 +7,11 @@ from __future__ import annotations
 
 import os
 import uuid
+from pathlib import Path
 
 from lxml import etree
 
-from docx_mcp.document import DocxDocument, W, W14
+from docx_mcp.document import W14, DocxDocument, W
 
 _DATE = "2026-05-01T00:00:00Z"
 
@@ -88,14 +89,14 @@ class TestGenerateChangeSummary:
         _inject_ins(doc, "newly added content")
         result = doc.generate_change_summary(str(tmp_path / "out.txt"))
         assert os.path.exists(result["path"])
-        content = open(result["path"]).read()
+        content = Path(result["path"]).read_text()
         assert "newly added content" in content
 
     def test_deletion_text_in_output(self, tmp_path):
         doc = _make_doc(tmp_path)
         _inject_del(doc, "removed content")
         result = doc.generate_change_summary(str(tmp_path / "out.txt"))
-        content = open(result["path"]).read()
+        content = Path(result["path"]).read_text()
         assert "removed content" in content
 
     def test_change_count_matches_entries(self, tmp_path):
@@ -123,7 +124,7 @@ class TestGenerateChangeSummary:
         doc = _make_doc(tmp_path)
         _inject_replacement(doc, "old value", "new value")
         result = doc.generate_change_summary(str(tmp_path / "out.txt"))
-        content = open(result["path"]).read()
+        content = Path(result["path"]).read_text()
         assert "old value" in content
         assert "new value" in content
         # Replacement must be clearly labelled (case-insensitive)
@@ -133,7 +134,7 @@ class TestGenerateChangeSummary:
         doc = _make_doc(tmp_path)
         _inject_ins(doc, "text by Bob", author="Bob")
         result = doc.generate_change_summary(str(tmp_path / "out.txt"))
-        content = open(result["path"]).read()
+        content = Path(result["path"]).read_text()
         assert "Bob" in content
 
     def test_returns_path_and_count_keys(self, tmp_path):

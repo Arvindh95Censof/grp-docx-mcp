@@ -75,7 +75,8 @@ class TestFootnoteCRUD:
         assert "Revised text" in fn["text"]
 
     def test_consecutive_footnotes_produce_comma_delimiter(self):
-        """Two add_footnote() calls on the same paragraph insert a superscript comma between refs."""
+        """Two add_footnote() calls on the same paragraph insert a superscript comma
+        between refs."""
         W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
         W14 = "http://schemas.microsoft.com/office/word/2010/wordml"
 
@@ -223,7 +224,9 @@ class TestFootnoteRef:
         server.add_footnote_ref("00000003", fid)
         count_after = len(fn_tree.findall(f"{{{W}}}footnote"))
 
-        assert count_after == count_before, "add_footnote_ref must not create a new footnote definition"
+        assert count_after == count_before, (
+            "add_footnote_ref must not create a new footnote definition"
+        )
 
     def test_add_footnote_ref_comma_delimiter_with_existing_ref(self):
         """add_footnote_ref inserts comma when the target paragraph already ends with a ref."""
@@ -337,7 +340,6 @@ class TestFootnoteUrlHotlink:
 
     def test_add_footnote_with_url_contains_hyperlink_element(self):
         """add_footnote with url= produces a <w:hyperlink> in the footnote body."""
-        from lxml import etree
 
         W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
         R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
@@ -381,7 +383,7 @@ class TestFootnoteUrlHotlink:
         URL = "https://example.com/source"
 
         result = _j(server.add_footnote("00000004", "Cited source", url=URL))
-        fid = result["footnote_id"]
+        _ = result["footnote_id"]
 
         doc_obj = server._docs[server._DEFAULT_HANDLE]
         rels = doc_obj._tree("word/_rels/footnotes.xml.rels")
@@ -398,7 +400,6 @@ class TestFootnoteUrlHotlink:
 
     def test_add_footnote_without_url_no_hyperlink(self):
         """add_footnote without url= produces no <w:hyperlink> (backward-compat)."""
-        from lxml import etree
 
         W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 

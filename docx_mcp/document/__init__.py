@@ -24,8 +24,8 @@ from .base import (
 )
 from .bookmarks import BookmarksMixin
 from .captions import CaptionMixin
-from .charts import ChartsMixin
 from .changesummary import ChangeSummaryMixin
+from .charts import ChartsMixin
 from .clausediff import ClauseDiffMixin
 from .comments import CommentsMixin
 from .compare import CompareMixin

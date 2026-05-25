@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import contextlib
+
 from lxml import etree
 
-from .base import W14, W, RELS, _preserve
+from .base import W14, W, _preserve
 
 _RELS_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
 _HYPERLINK_REL_TYPE = (
@@ -59,7 +60,6 @@ class FootnotesMixin:
             nsmap={None: _RELS_NS},
         )
         self._trees[rels_path] = root
-        from pathlib import Path
         fp = self.workdir / rels_path
         fp.parent.mkdir(parents=True, exist_ok=True)
         etree.ElementTree(root).write(
@@ -69,7 +69,10 @@ class FootnotesMixin:
 
     def _add_external_hyperlink_rel(self, rels_path: str, url: str) -> str:
         """Add an External hyperlink relationship for url; return its rId."""
-        root = self._get_or_create_footnotes_rels() if rels_path == "word/_rels/footnotes.xml.rels" else self._tree(rels_path)
+        if rels_path == "word/_rels/footnotes.xml.rels":
+            root = self._get_or_create_footnotes_rels()
+        else:
+            root = self._tree(rels_path)
         max_rid = 0
         for rel in root.findall(f"{{{_RELS_NS}}}Relationship"):
             rid = rel.get("Id", "")
