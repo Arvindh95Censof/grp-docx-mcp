@@ -11,7 +11,7 @@
   <img width="380" height="200" src="https://glama.ai/mcp/servers/SecurityRonin/docx-mcp/badges/card.svg" alt="docx-mcp MCP server" />
 </a>
 
-Give your AI coding agent the ability to create, read, and edit Word documents. Every edit appears as a tracked change in Microsoft Word — red strikethrough for deletions, green underline for insertions, comments in the sidebar — so your colleagues see exactly what changed and why.
+Give your AI coding agent the ability to create, read, and edit Word documents. Edits appear as tracked changes in Microsoft Word — red strikethrough for deletions, green underline for insertions — and after any revision session your agent can produce an email-ready change log listing every insertion, deletion, and replacement. Or compare two separate files to get the same output automatically.
 
 ## Who This Is For
 
@@ -104,7 +104,8 @@ pip install docx-mcp-server
 | Capability | What your agent can do |
 |---|---|
 | **Create documents** | Start blank, from a `.dotx` template, or from markdown — headings, tables, lists, images, footnotes, code blocks, smart typography |
-| **Track changes** | Insert and delete text with proper revision marks that show up in Word's review pane |
+| **Track changes** | Insert, delete, and replace text as tracked revisions — underlined insertions, red strikethrough deletions. Pass `tracked=False` to any editing tool to write the change directly with no revision markup. Accept or reject changes by author. |
+| **Change log** | After editing with tracked changes, call `generate_change_summary` for a numbered .txt listing every insertion, deletion, and replacement. Or use `diff_to_text` to compare two separate files and get the same output automatically — useful for document versions you didn't edit yourself. |
 | **Comments** | Add comments anchored to specific paragraphs, reply to comment threads |
 | **Find and replace** | Search by text or regex across body, footnotes, and comments — then make targeted edits |
 | **Tables** | Create tables, modify cells, add or delete rows — all with revision tracking |
@@ -134,6 +135,38 @@ pip install docx-mcp-server
 
 Open the output in Word and you see exactly what a human reviewer would produce — revision marks, comments in the margin, clean document structure.
 
+## Example: Change Log After a Revision Session
+
+```
+1. open_document("contract.docx")
+2. replace_text(para_id, "30 days", "60 days")           → tracked revision (del + ins)
+3. add_comment(para_id, "Extended per Amendment 3")
+4. save_document("contract_redlined.docx")
+5. generate_change_summary("contract_changes.txt")
+```
+
+The `.txt` output reads like:
+
+```
+1. REPLACEMENT by Claude on 2026-05-25
+   Deleted:  "30 days"
+   Inserted: "60 days"
+```
+
+Paste it into an email, a PR description, or a handover note.
+
+## Example: Compare Two Separate Document Versions
+
+No editing session required — point it at any two files:
+
+```
+1. diff_to_text("proposal_v1.docx", "proposal_v2.docx")
+```
+
+Returns two files:
+- `proposal_v1_diff.docx` — open in Word to see tracked changes inline
+- `proposal_v1_diff.txt` — plain-text summary, ready to paste anywhere
+
 ## Example: Pentest Report from Markdown
 
 ```
@@ -153,7 +186,7 @@ A `.docx` file is a ZIP archive of XML files. This server unpacks the archive, e
 Every edit is validated against the OOXML specification before saving, catching issues like orphaned footnotes, duplicate internal IDs, and broken cross-references that would otherwise cause Word to "repair" (and silently rewrite) your document.
 
 <details>
-<summary>Full tool inventory (45 tools)</summary>
+<summary>Full tool inventory (200+ tools)</summary>
 
 ### Document Lifecycle
 
@@ -178,11 +211,24 @@ Every edit is validated against the OOXML specification before saving, catching 
 
 | Tool | Description |
 |---|---|
-| `insert_text` | Insert text with tracked-change markup |
-| `delete_text` | Mark text as deleted with tracked-change markup |
-| `accept_changes` | Accept tracked changes (all or by author) |
-| `reject_changes` | Reject tracked changes (all or by author) |
+| `insert_text` | Insert text as tracked revision (underlined in Word) — or directly with `tracked=False` |
+| `delete_text` | Mark text deleted (red strikethrough in Word) — or remove directly with `tracked=False` |
+| `replace_text` | Replace text as a tracked del+ins pair — or directly with `tracked=False` |
+| `modify_cell` | Modify a table cell — tracked by default, `tracked=False` for direct writes |
+| `edit_header_footer` | Edit header/footer text — tracked by default, `tracked=False` for direct writes |
 | `set_formatting` | Apply bold/italic/underline/color with tracked-change markup |
+| `set_track_changes` | Enable or disable Word's built-in track-changes recording flag |
+| `get_tracked_changes` | List all pending tracked changes (author, date, type, text) |
+| `accept_changes` | Accept tracked changes, optionally filtered by author |
+| `reject_changes` | Reject tracked changes, optionally filtered by author |
+
+### Change Log
+
+| Tool | Description |
+|---|---|
+| `generate_change_summary` | Export all tracked changes in the open document as a numbered .txt file — insertions, deletions, and adjacent del+ins pairs grouped as replacements |
+| `compare_documents` | Diff two DOCX files and produce a tracked-change DOCX (Word-openable) |
+| `diff_to_text` | Diff two DOCX files and produce both a tracked-change DOCX and a plain-text summary .txt |
 
 ### Tables
 

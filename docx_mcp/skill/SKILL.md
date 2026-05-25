@@ -59,6 +59,46 @@ Supports: headings, bold/italic/strikethrough, links, images, bullet/numbered/ne
 
 **Always `audit_document()` before saving** to catch structural issues (orphaned footnotes, duplicate paraIds, unpaired bookmarks, missing relationship targets).
 
+### Generating a Change Log from an Edited Document
+
+After making tracked edits, export a human-readable summary:
+
+```
+1. open_document("/path/to/file.docx")
+2. ... make edits with tracked=True (default) ...
+3. save_document("/path/to/output.docx")
+4. generate_change_summary("/path/to/output_changes.txt")
+   → {"path": "..._changes.txt", "change_count": N}
+```
+
+The `.txt` lists each change as a numbered entry — INSERTION, DELETION, or REPLACEMENT — with author, date, and text. Paste it into an email, a PR description, or a client handover note.
+
+Use `generate_change_summary` when you **have the open document** with tracked edits.  
+Use `diff_to_text` when you **have two separate files** you want to compare.
+
+### Comparing Two DOCX Files
+
+When you have an original and a revised file (not the same editing session):
+
+```
+1. diff_to_text("original.docx", "revised.docx")
+   → {"docx_path": "original_diff.docx", "text_path": "original_diff.txt", "change_count": N}
+```
+
+`diff_to_text` runs a paragraph-level diff, writes a tracked-change DOCX, and writes the same numbered plain-text summary as `generate_change_summary`. To get only the DOCX without the .txt, use `compare_documents` instead.
+
+### Direct Edits Without Revision Markup
+
+When you want to apply edits silently (no accept/reject required by the reviewer):
+
+```
+replace_text(para_id, find="DRAFT", replace="FINAL", tracked=False)
+insert_text(para_id, " (Amended)", tracked=False)
+modify_cell(0, 0, 0, "Updated value", tracked=False)
+```
+
+All five editing tools (`insert_text`, `delete_text`, `replace_text`, `modify_cell`, `edit_header_footer`) support `tracked=False`. The default is always `tracked=True`.
+
 ## Tool Quick Reference
 
 ### Document Lifecycle
@@ -82,13 +122,28 @@ Supports: headings, bold/italic/strikethrough, links, images, bullet/numbered/ne
 
 ### Track Changes
 
+All five editing tools default to `tracked=True`. Pass `tracked=False` to any of them when you want the edit applied directly with no revision markup (useful for programmatic transforms the reviewer doesn't need to accept).
+
 | Tool | Purpose | Key args |
 |------|---------|----------|
-| `insert_text` | Tracked insertion (green underline) | `para_id`, `text`, `position` |
-| `delete_text` | Tracked deletion (red strikethrough) | `para_id`, `text` |
+| `insert_text` | Tracked insertion (underlined in Word) | `para_id`, `text`, `position`, `tracked` |
+| `delete_text` | Tracked deletion (red strikethrough) | `para_id`, `text`, `tracked` |
+| `replace_text` | Tracked del+ins pair — preferred for one-step replacement | `para_id`, `find`, `replace`, `tracked` |
+| `modify_cell` | Modify table cell text | `table_index`, `row`, `col`, `text`, `tracked` |
+| `edit_header_footer` | Edit header/footer text | `location`, `old_text`, `new_text`, `tracked` |
+| `set_formatting` | Bold/italic/underline/color with tracked markup | `para_id`, `text`, `bold`, `italic`, `underline`, `color` |
+| `set_track_changes` | Toggle Word's track-changes recording flag | `enabled` |
+| `get_tracked_changes` | List pending changes (author, date, type, text) | — |
 | `accept_changes` | Accept tracked changes | `author` (optional) |
 | `reject_changes` | Reject tracked changes | `author` (optional) |
-| `set_formatting` | Bold/italic/underline/color with tracked markup | `para_id`, `text`, `bold`, `italic`, `underline`, `color` |
+
+### Change Log
+
+| Tool | Purpose | Key args |
+|------|---------|----------|
+| `generate_change_summary` | Export tracked changes in the open doc as .txt | `output_path` (optional) |
+| `compare_documents` | Diff two files → tracked-change DOCX | `base_path`, `revised_path`, `output_path` |
+| `diff_to_text` | Diff two files → tracked-change DOCX + .txt | `base_path`, `revised_path`, `docx_output`, `text_output` |
 
 ### Tables
 
@@ -169,13 +224,23 @@ Supports: headings, bold/italic/strikethrough, links, images, bullet/numbered/ne
 
 ## Essential Patterns
 
-### Replace Text (delete + insert on same paragraph)
+### Replace Text
+
+**Preferred — one-step:**
 
 ```
-1. search_text("30 days")              → find the paragraph
-2. get_paragraph(para_id)              → verify exact text
-3. delete_text(para_id, "30 days")     → tracked deletion
-4. insert_text(para_id, "60 days")     → tracked insertion
+1. search_text("30 days")                              → find the paragraph
+2. get_paragraph(para_id)                              → verify exact text
+3. replace_text(para_id, find="30 days", replace="60 days")
+```
+
+`replace_text` produces the same del+ins pair as the two-step approach but as a single call. It only marks the actually-changed portion, leaving common leading/trailing text as plain runs.
+
+**Two-step alternative** (use when you need to insert at a specific position relative to other content):
+
+```
+1. delete_text(para_id, "30 days")     → tracked deletion (red strikethrough)
+2. insert_text(para_id, "60 days")     → tracked insertion (underlined)
 ```
 
 Word shows both marks side by side: ~~30 days~~ **60 days**.
@@ -262,6 +327,7 @@ Text inside `w:hyperlink` elements may not appear in `paragraph.text` from some 
 
 | Rule | Detail |
 |------|--------|
+| Default is `tracked=True` | All five editing tools (`insert_text`, `delete_text`, `replace_text`, `modify_cell`, `edit_header_footer`) emit revision markup by default. Pass `tracked=False` for immediate, silent edits. |
 | Use `w:delText` inside `w:del` | Never `w:t` — causes validation errors |
 | Preserve `w:rPr` formatting | Copy the original run's formatting into tracked change runs |
 | Minimal edits only | Mark only what changes — don't wrap entire paragraphs |
@@ -344,10 +410,11 @@ add_footnote(para_id, "SWGDE Best Practices for Mobile Device Evidence Collectio
 Before delivering any edited document, run through this checklist:
 
 ```
-1. audit_document()         → comprehensive structural check
-2. validate_footnotes()     → if any footnotes were added/modified
-3. validate_paraids()       → if any structural changes were made
-4. save_document("new.docx") → save to new file (preserve original)
+1. audit_document()              → comprehensive structural check
+2. validate_footnotes()          → if any footnotes were added/modified
+3. validate_paraids()            → if any structural changes were made
+4. save_document("new.docx")     → save to new file (preserve original)
+5. generate_change_summary()     → (optional) produce .txt change log for handover
 ```
 
 The `audit_document()` tool checks all of the following in one call:
