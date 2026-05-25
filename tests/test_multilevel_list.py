@@ -170,8 +170,7 @@ class TestMultilevelList:
         num_tree = doc._tree("word/numbering.xml")
         abs_id = str(result["abstract_num_id"])
         abstract = next(
-            a for a in num_tree.findall(f"{W}abstractNum")
-            if a.get(f"{W}abstractNumId") == abs_id
+            a for a in num_tree.findall(f"{W}abstractNum") if a.get(f"{W}abstractNumId") == abs_id
         )
         for ilvl, lvl_def in enumerate(levels):
             lvl = abstract.findall(f"{W}lvl")[ilvl]
@@ -181,9 +180,7 @@ class TestMultilevelList:
             assert tabs is not None, f"ilvl={ilvl}: missing w:tabs in w:pPr"
             tab_els = tabs.findall(f"{W}tab")
             assert tab_els, f"ilvl={ilvl}: no w:tab children"
-            num_tab = next(
-                (t for t in tab_els if t.get(f"{W}val") == "num"), None
-            )
+            num_tab = next((t for t in tab_els if t.get(f"{W}val") == "num"), None)
             assert num_tab is not None, f"ilvl={ilvl}: no w:tab[@w:val='num']"
             expected_pos = str(lvl_def["indent"])
             assert num_tab.get(f"{W}pos") == expected_pos, (

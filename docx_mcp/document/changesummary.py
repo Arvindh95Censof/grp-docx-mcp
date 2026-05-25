@@ -42,21 +42,25 @@ def _collect_changes(doc: etree._Element) -> list[dict]:
                 idx = siblings.index(el)
                 if idx + 1 < len(siblings) and siblings[idx + 1].tag == f"{W}ins":
                     ins_el = siblings[idx + 1]
-                    changes.append({
-                        "type": "replacement",
-                        "old": _del_text(el),
-                        "new": _ins_text(ins_el),
-                        "author": _author(el),
-                        "date": _date(el),
-                    })
+                    changes.append(
+                        {
+                            "type": "replacement",
+                            "old": _del_text(el),
+                            "new": _ins_text(ins_el),
+                            "author": _author(el),
+                            "date": _date(el),
+                        }
+                    )
                     i += 1  # skip the paired w:ins on next iteration
                 else:
-                    changes.append({
-                        "type": "deletion",
-                        "text": _del_text(el),
-                        "author": _author(el),
-                        "date": _date(el),
-                    })
+                    changes.append(
+                        {
+                            "type": "deletion",
+                            "text": _del_text(el),
+                            "author": _author(el),
+                            "date": _date(el),
+                        }
+                    )
         elif el.tag == f"{W}ins":
             # Only record standalone insertions; paired ones are consumed above.
             parent = el.getparent()
@@ -66,12 +70,14 @@ def _collect_changes(doc: etree._Element) -> list[dict]:
                 if idx > 0 and siblings[idx - 1].tag == f"{W}del":
                     pass  # already recorded as replacement
                 else:
-                    changes.append({
-                        "type": "insertion",
-                        "text": _ins_text(el),
-                        "author": _author(el),
-                        "date": _date(el),
-                    })
+                    changes.append(
+                        {
+                            "type": "insertion",
+                            "text": _ins_text(el),
+                            "author": _author(el),
+                            "date": _date(el),
+                        }
+                    )
         i += 1
 
     return changes
@@ -118,9 +124,7 @@ class ChangeSummaryMixin:
             ``{"path": str, "change_count": int}``
         """
         if not output_path:
-            output_path = str(self.source_path.with_name(
-                self.source_path.stem + "_changes.txt"
-            ))
+            output_path = str(self.source_path.with_name(self.source_path.stem + "_changes.txt"))
 
         doc = self._require("word/document.xml")
         changes = _collect_changes(doc)

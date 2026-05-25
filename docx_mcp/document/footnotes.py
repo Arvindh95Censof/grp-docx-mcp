@@ -22,9 +22,12 @@ class FootnotesMixin:
         """Return max bookmark/markup w:id across all loaded parts + 1."""
         max_id = 0
         markup_tags = (
-            f"{W}bookmarkStart", f"{W}bookmarkEnd",
-            f"{W}ins", f"{W}del",
-            f"{W}commentRangeStart", f"{W}commentRangeEnd",
+            f"{W}bookmarkStart",
+            f"{W}bookmarkEnd",
+            f"{W}ins",
+            f"{W}del",
+            f"{W}commentRangeStart",
+            f"{W}commentRangeEnd",
         )
         for tree in self._trees.values():
             for tag in markup_tags:
@@ -168,13 +171,10 @@ class FootnotesMixin:
     def _insert_fn_ref(self, para: etree._Element, footnote_id: int, anchor: str) -> None:
         """Append a hyperlink-wrapped footnoteReference run to para, with comma if needed."""
         last_elem = next(
-            (c for c in reversed(list(para))
-             if c.tag in (f"{W}r", f"{W}hyperlink")),
+            (c for c in reversed(list(para)) if c.tag in (f"{W}r", f"{W}hyperlink")),
             None,
         )
-        needs_comma = last_elem is not None and bool(
-            list(last_elem.iter(f"{W}footnoteReference"))
-        )
+        needs_comma = last_elem is not None and bool(list(last_elem.iter(f"{W}footnoteReference")))
         if needs_comma:
             comma_r = etree.SubElement(para, f"{W}r")
             comma_rpr = etree.SubElement(comma_r, f"{W}rPr")
@@ -214,12 +214,10 @@ class FootnotesMixin:
 
         # Ensure the target footnote has a bookmark (retroactively add if missing)
         target_fn = next(
-            fn for fn in fn_tree.findall(f"{W}footnote")
-            if fn.get(f"{W}id") == str(footnote_id)
+            fn for fn in fn_tree.findall(f"{W}footnote") if fn.get(f"{W}id") == str(footnote_id)
         )
         has_bookmark = any(
-            el.get(f"{W}name") == anchor
-            for el in target_fn.iter(f"{W}bookmarkStart")
+            el.get(f"{W}name") == anchor for el in target_fn.iter(f"{W}bookmarkStart")
         )
         if not has_bookmark:
             fn_para = target_fn.find(f"{W}p")

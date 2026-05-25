@@ -97,14 +97,10 @@ class TestFootnoteCRUD:
         children = list(para)
         # Footnote refs are wrapped in <w:hyperlink w:anchor="_FnN">
         fn_elems = [
-            c for c in children
-            if (
-                c.tag == f"{{{W}}}hyperlink"
-                and list(c.iter(f"{{{W}}}footnoteReference"))
-            ) or (
-                c.tag == f"{{{W}}}r"
-                and c.find(f"{{{W}}}footnoteReference") is not None
-            )
+            c
+            for c in children
+            if (c.tag == f"{{{W}}}hyperlink" and list(c.iter(f"{{{W}}}footnoteReference")))
+            or (c.tag == f"{{{W}}}r" and c.find(f"{{{W}}}footnoteReference") is not None)
         ]
         assert len(fn_elems) >= 2, "Expected at least two footnote reference elements"
 
@@ -133,7 +129,8 @@ class TestFootnoteCRUD:
         doc_tree = doc_obj._tree("word/document.xml")
 
         hyperlinks = [
-            el for el in doc_tree.iter(f"{{{W}}}hyperlink")
+            el
+            for el in doc_tree.iter(f"{{{W}}}hyperlink")
             if list(el.iter(f"{{{W}}}footnoteReference"))
             and el.get(f"{{{W}}}anchor") == f"_Fn{fid}"
         ]
@@ -152,11 +149,11 @@ class TestFootnoteCRUD:
         fn_tree = doc_obj._tree("word/footnotes.xml")
 
         target_fn = next(
-            fn for fn in fn_tree.findall(f"{{{W}}}footnote")
-            if fn.get(f"{{{W}}}id") == str(fid)
+            fn for fn in fn_tree.findall(f"{{{W}}}footnote") if fn.get(f"{{{W}}}id") == str(fid)
         )
         bookmarks = [
-            el for el in target_fn.iter(f"{{{W}}}bookmarkStart")
+            el
+            for el in target_fn.iter(f"{{{W}}}bookmarkStart")
             if el.get(f"{{{W}}}name") == f"_Fn{fid}"
         ]
         assert len(bookmarks) == 1, f"Expected bookmark '_Fn{fid}' in footnote definition"
@@ -174,7 +171,8 @@ class TestFootnoteCRUD:
         doc_tree = doc_obj._tree("word/document.xml")
 
         remaining = [
-            el for el in doc_tree.iter(f"{{{W}}}hyperlink")
+            el
+            for el in doc_tree.iter(f"{{{W}}}hyperlink")
             if el.get(f"{{{W}}}anchor") == f"_Fn{fid}"
         ]
         assert remaining == [], "Hyperlink container must be removed on delete"
@@ -199,7 +197,8 @@ class TestFootnoteRef:
         doc_tree = doc_obj._tree("word/document.xml")
 
         hyperlinks = [
-            el for el in doc_tree.iter(f"{{{W}}}hyperlink")
+            el
+            for el in doc_tree.iter(f"{{{W}}}hyperlink")
             if el.get(f"{{{W}}}anchor") == f"_Fn{fid}"
         ]
         # One from add_footnote (para 00000004), one from add_footnote_ref (para 00000003)
@@ -245,17 +244,14 @@ class TestFootnoteRef:
         doc_tree = doc_obj._tree("word/document.xml")
 
         para = next(
-            p for p in doc_tree.iter(f"{{{W}}}p")
-            if p.get(f"{{{W14}}}paraId") == "00000003"
+            p for p in doc_tree.iter(f"{{{W}}}p") if p.get(f"{{{W14}}}paraId") == "00000003"
         )
         children = list(para)
         fn_elems = [
-            c for c in children
-            if (
-                c.tag == f"{{{W}}}hyperlink" and list(c.iter(f"{{{W}}}footnoteReference"))
-            ) or (
-                c.tag == f"{{{W}}}r" and c.find(f"{{{W}}}footnoteReference") is not None
-            )
+            c
+            for c in children
+            if (c.tag == f"{{{W}}}hyperlink" and list(c.iter(f"{{{W}}}footnoteReference")))
+            or (c.tag == f"{{{W}}}r" and c.find(f"{{{W}}}footnoteReference") is not None)
         ]
         assert len(fn_elems) >= 2
 
@@ -391,8 +387,7 @@ class TestFootnoteUrlHotlink:
 
         relationships = rels.findall(f"{{{RELS_NS}}}Relationship")
         external_for_url = [
-            r for r in relationships
-            if r.get("Target") == URL and r.get("TargetMode") == "External"
+            r for r in relationships if r.get("Target") == URL and r.get("TargetMode") == "External"
         ]
         assert len(external_for_url) == 1, (
             f"Expected one External relationship for {URL!r}, found {len(external_for_url)}"
@@ -410,8 +405,7 @@ class TestFootnoteUrlHotlink:
         fn_tree = doc_obj._tree("word/footnotes.xml")
 
         target_fn = next(
-            fn for fn in fn_tree.findall(f"{{{W}}}footnote")
-            if fn.get(f"{{{W}}}id") == str(fid)
+            fn for fn in fn_tree.findall(f"{{{W}}}footnote") if fn.get(f"{{{W}}}id") == str(fid)
         )
         hyperlinks = list(target_fn.iter(f"{{{W}}}hyperlink"))
         assert hyperlinks == [], "No hyperlink expected when url is omitted"
