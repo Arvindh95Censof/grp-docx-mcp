@@ -317,6 +317,123 @@ Word shows both marks side by side: ~~30 days~~ **60 days**.
 
 These hard-won lessons prevent silent document corruption. Word may "repair" broken documents by silently rewriting your edits.
 
+### Word for Mac: File-Refuses-to-Open Causes
+
+These four issues all produce "Word experienced an error trying to open the file" with no further detail. Each one causes a hard open failure on Word for Mac (Windows Word is more forgiving).
+
+#### 1. Field code elements in one `<w:r>` (fldChar + instrText)
+
+Every `w:fldChar` and `w:instrText` element must live in its **own separate `<w:r>`**. Packing begin/instrText/end into a single run is schema-invalid.
+
+```python
+# WRONG — all three in one run (causes hard open failure)
+r._r.append(fld_begin)
+r._r.append(instr)
+r._r.append(fld_end)
+
+# CORRECT — one element per run
+def _fld_run(para, fld_type=None, instr_text=None):
+    r = para.add_run()
+    if fld_type:
+        fc = OxmlElement('w:fldChar')
+        fc.set(qn('w:fldCharType'), fld_type)
+        r._r.append(fc)
+    if instr_text:
+        it = OxmlElement('w:instrText')
+        it.set('{http://www.w3.org/XML/1998/namespace}space', 'preserve')
+        it.text = instr_text
+        r._r.append(it)
+    return r
+
+_fld_run(para, fld_type='begin')
+_fld_run(para, instr_text=' PAGE ')
+_fld_run(para, fld_type='end')
+```
+
+Add `xml:space="preserve"` to every `w:instrText` so Word parses the instruction correctly.
+
+#### 2. `w:titlePg` without a matching "first" header/footer
+
+`w:titlePg` in `sectPr` tells Word to use a separate first-page header/footer. Word then **requires** a `<w:headerReference w:type="first">` entry. Declaring the flag without the part causes a load failure on Word for Mac.
+
+**Fix:** either provide the "first" header/footer part, or don't set `titlePg` at all. In python-docx, never set `section.different_first_page_header_footer = True` unless you also populate `section.first_page_header`.
+
+#### 3. PNG image relationships before header/footer relationships (Word for Mac bug)
+
+Word for Mac has an undocumented constraint: if a PNG image relationship appears **before** header/footer relationships in `word/_rels/document.xml.rels`, the file refuses to open. JPEG images before header/footer are fine; only PNG triggers this.
+
+Relationship ordering in the rels file follows the order parts are registered in python-docx. **Fix:** call `add_headers_footers()` (or any function that accesses `section.header`/`section.footer`) before any `add_picture()` calls in the generator. This ensures header/footer get lower rIds than all PNG images.
+
+```python
+def main():
+    doc = setup_document()
+    add_headers_footers(doc)   # ← must come BEFORE any add_picture() calls
+    build_cover(doc)           # ← adds first image here
+    build_section1(doc)
+    # ...
+```
+
+#### 4. `w:abstractNum` elements after `w:num` elements in numbering.xml
+
+`CT_Numbering` is a strict OOXML sequence: **all `w:abstractNum` elements must precede all `w:num` elements**. If your generator merges custom numbering into a template that already has `w:num` entries, a naive `.append()` puts the new `w:abstractNum` after existing `w:num` entries — schema violation, hard open failure.
+
+**Fix:** insert new `abstractNum` elements before the first existing `w:num`, then append new `num` elements at the end.
+
+```python
+first_num = root.find(f'{{{W}}}num')
+for child in abstract_nums:
+    if first_num is not None:
+        first_num.addprevious(child)   # insert before first w:num
+    else:
+        root.append(child)
+for child in nums:
+    root.append(child)                 # append after all w:num
+```
+
+#### 5. `wp:extent` cx/cy values in the billions (corrupted EMU dimensions)
+
+Word for Mac refuses to open a file when any `<wp:extent>` element has `cx` or `cy` in the billions or trillions of EMUs. Normal document images range from 1–10 million EMUs (roughly 1–11 inches at 914,400 EMU/inch).
+
+Two distinct causes, same symptom:
+
+**Cause A — PIL BytesIO without DPI metadata:**
+`PIL.Image.save(buf, format='JPEG', quality=92)` writes no DPI metadata to the BytesIO. python-docx's image parser defaults to DPI ≈ 0, computing an astronomical "natural" width. Even when `width=Inches(5.8)` is specified, the derived `cy` (height) is calculated from the corrupted natural dimensions.
+
+```python
+# WRONG — no DPI in BytesIO → python-docx gets DPI≈0 → cx/cy in trillions
+img.save(buf, format='JPEG', quality=92)
+
+# CORRECT — embed DPI so python-docx computes sane natural dimensions
+img.save(buf, format='JPEG', quality=92, dpi=(96, 96))
+```
+
+**Cause B — double EMU conversion:**
+A helper that calls `Inches(width)` internally receives a pre-converted EMU value instead of a float. Tell-tale signature: `4,849,538,688,000 = 5,303,520 × 914,400` — the display width (`Inches(5.8)`) multiplied by `Inches()` a second time.
+
+```python
+TEXT_WIDTH = Inches(5.8)          # = 5,303,520 EMU
+
+# WRONG — add_image() calls Inches(width) internally, caller passes EMU
+add_image(doc, path, width=TEXT_WIDTH)   # → Inches(5303520) = 4,849,538,688,000
+
+# CORRECT — pass float inches so the internal Inches() call is the only conversion
+add_image(doc, path, width=5.8)
+```
+
+**Detection script:**
+```python
+import zipfile
+from lxml import etree
+
+with zipfile.ZipFile("file.docx") as z:
+    tree = etree.fromstring(z.read("word/document.xml"))
+WPD = 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing'
+for i, ext in enumerate(tree.iter(f'{{{WPD}}}extent')):
+    cx = int(ext.get('cx', 0))
+    if cx > 100_000_000:  # > ~109 inches
+        print(f"Drawing {i}: cx={cx:,}  *** OVERSIZED — will fail on Word for Mac")
+```
+
 ### ParaId Rules
 
 Every `<w:p>` and `<w:tr>` element has a `w14:paraId` attribute.
