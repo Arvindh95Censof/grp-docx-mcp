@@ -1,4 +1,10 @@
-# docx-mcp
+# censof-docx-mcp
+
+> **Fork of [SecurityRonin/docx-mcp](https://github.com/SecurityRonin/docx-mcp)** (MIT). Tracks upstream and adds a
+> layout/template-map toolset (`get_all_paragraphs`, `fill_paragraph_by_index`, `inject_para_ids`,
+> `bulk_replace_text`, `get_template_map`, `apply_table_cell_style`, `copy_table_style`,
+> `extract_template_structure`) plus cm/align sizing for inline images. All credit for the base project to the
+> original author; see [LICENSE](LICENSE).
 
 [![PyPI](https://img.shields.io/pypi/v/docx-mcp-server?color=blue)](https://pypi.org/project/docx-mcp-server/)
 [![Python](https://img.shields.io/pypi/pyversions/docx-mcp-server)](https://pypi.org/project/docx-mcp-server/)
