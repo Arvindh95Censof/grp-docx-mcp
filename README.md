@@ -1,4 +1,4 @@
-# censof-docx-mcp
+# grp-docx-mcp
 
 > **Fork of [SecurityRonin/docx-mcp](https://github.com/SecurityRonin/docx-mcp)** (MIT). Tracks upstream and adds a
 > layout/template-map toolset (`get_all_paragraphs`, `fill_paragraph_by_index`, `inject_para_ids`,
@@ -6,8 +6,8 @@
 > `extract_template_structure`) plus cm/align sizing for inline images. All credit for the base project to the
 > original author; see [LICENSE](LICENSE).
 
-[![PyPI](https://img.shields.io/pypi/v/docx-mcp-server?color=blue)](https://pypi.org/project/docx-mcp-server/)
-[![Python](https://img.shields.io/pypi/pyversions/docx-mcp-server)](https://pypi.org/project/docx-mcp-server/)
+[![PyPI](https://img.shields.io/pypi/v/grp-docx-mcp?color=blue)](https://pypi.org/project/grp-docx-mcp/)
+[![Python](https://img.shields.io/pypi/pyversions/grp-docx-mcp)](https://pypi.org/project/grp-docx-mcp/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/SecurityRonin/docx-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/SecurityRonin/docx-mcp/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)](https://github.com/SecurityRonin/docx-mcp)
