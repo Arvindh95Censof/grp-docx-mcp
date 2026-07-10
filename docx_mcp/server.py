@@ -677,13 +677,20 @@ def get_images(document_handle: str = "") -> str:
 def insert_image(
     para_id: str,
     image_path: str,
-    width_emu: int = 2000000,
-    height_emu: int = 2000000,
+    width_emu: int = 0,
+    height_emu: int = 0,
+    width_cm: float = 0.0,
+    height_cm: float = 0.0,
+    align: str = "left",
     document_handle: str = "",
 ) -> str:
-    """Insert an image into the document after a paragraph."""
+    """Insert an image after a paragraph. Size in cm (preferred) or EMU; cm overrides EMU.
+
+    align sets the image paragraph alignment (left/center/right).
+    """
     _, doc = _resolve(document_handle)
-    return _js(doc.insert_image(para_id, image_path, width_emu=width_emu, height_emu=height_emu))
+    return _js(doc.insert_image(para_id, image_path, width_emu=width_emu, height_emu=height_emu,
+                                width_cm=width_cm, height_cm=height_cm, align=align))
 
 
 @mcp.tool()
@@ -3074,6 +3081,75 @@ class _Module(_sys.modules[__name__].__class__):
 
 
 _sys.modules[__name__].__class__ = _Module
+
+
+# ── Layout / template-map tools ─────────────────────────────────────────────
+
+
+@mcp.tool()
+def get_template_map(document_handle: str = "") -> str:
+    """Return the template style map: default font/size, named paragraph styles,
+    table styles, and page margins. Use before filling to match formatting."""
+    _, doc = _resolve(document_handle)
+    m = doc.extract_style_map()
+    return _js({k: v for k, v in m.items() if k != "first_table_tblPr"})
+
+
+@mcp.tool()
+def apply_table_cell_style(table_idx: int, style_id: str, document_handle: str = "") -> str:
+    """Apply a paragraph style to every cell in a table (e.g. "TableText", "Table-Text").
+    Use after add_table + copy_table_style to match template formatting."""
+    _, doc = _resolve(document_handle)
+    return _js(doc.apply_table_cell_style(table_idx, style_id))
+
+
+@mcp.tool()
+def copy_table_style(source_idx: int, target_idx: int, document_handle: str = "") -> str:
+    """Copy borders, width, and style from one table to another. Use after add_table
+    to make new tables match existing template tables."""
+    _, doc = _resolve(document_handle)
+    return _js(doc.copy_table_style(source_idx, target_idx))
+
+
+@mcp.tool()
+def inject_para_ids(document_handle: str = "") -> str:
+    """Assign w14:paraId to every paragraph missing one, so paraId-based tools work.
+    Returns the count injected. Run once on templates created without paraIds."""
+    _, doc = _resolve(document_handle)
+    return _js(doc.inject_para_ids())
+
+
+@mcp.tool()
+def get_all_paragraphs(document_handle: str = "") -> str:
+    """Return all body paragraphs with index, style, text, and paraId.
+    Use to discover indices for fill_paragraph_by_index or paraIds after inject_para_ids."""
+    _, doc = _resolve(document_handle)
+    return _js(doc.get_all_paragraphs())
+
+
+@mcp.tool()
+def fill_paragraph_by_index(index: int, text: str, document_handle: str = "") -> str:
+    """Replace all text in a paragraph by its zero-based index, preserving the paragraph
+    style and first run's formatting. Use get_all_paragraphs first to find the index."""
+    _, doc = _resolve(document_handle)
+    return _js(doc.fill_paragraph_by_index(index, text))
+
+
+@mcp.tool()
+def bulk_replace_text(replacements: dict, document_handle: str = "") -> str:
+    """Find and replace text across all body paragraphs, handling text split across runs.
+    replacements maps search_text -> replacement_text (case-sensitive)."""
+    _, doc = _resolve(document_handle)
+    return _js(doc.bulk_replace_text(replacements))
+
+
+@mcp.tool()
+def extract_template_structure(document_handle: str = "") -> str:
+    """Extract full structure: all paragraphs (index, style, text, paraId) and tables
+    (index, dimensions, cell content). Use to map a template before filling it."""
+    _, doc = _resolve(document_handle)
+    return _js(doc.extract_template_structure())
+
 
 
 # ── Entry point ─────────────────────────────────────────────────────────────

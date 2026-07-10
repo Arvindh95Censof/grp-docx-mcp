@@ -56,22 +56,40 @@ class ImagesMixin:
             images.append(info)
         return images
 
+    _CM_TO_EMU = 360000
+    _INCH_TO_EMU = 914400
+
     def insert_image(
         self,
         para_id: str,
         image_path: str,
         *,
-        width_emu: int = 2000000,
-        height_emu: int = 2000000,
+        width_emu: int = 0,
+        height_emu: int = 0,
+        width_cm: float = 0.0,
+        height_cm: float = 0.0,
+        align: str = "left",
     ) -> dict:
         """Insert an image into the document after a paragraph.
 
         Args:
             para_id: paraId of the paragraph to insert after.
             image_path: Path to the image file on disk.
-            width_emu: Image width in EMUs (914400 = 1 inch).
-            height_emu: Image height in EMUs.
+            width_emu: Image width in EMUs (914400 = 1 inch). Used if cm not set.
+            height_emu: Image height in EMUs. Used if cm not set.
+            width_cm: Image width in centimetres (overrides width_emu).
+            height_cm: Image height in centimetres (overrides height_emu).
+            align: Paragraph alignment — "left", "center", or "right".
         """
+        # Resolve final EMU dimensions
+        if width_cm:
+            width_emu = int(width_cm * self._CM_TO_EMU)
+        if height_cm:
+            height_emu = int(height_cm * self._CM_TO_EMU)
+        if not width_emu:
+            width_emu = 2000000
+        if not height_emu:
+            height_emu = width_emu  # square if only width given
         doc = self._require("word/document.xml")
         para = self._find_para(doc, para_id)
         if para is None:
@@ -120,6 +138,10 @@ class ImagesMixin:
         new_para = etree.Element(f"{W}p")
         new_para.set(f"{W14}paraId", self._new_para_id())
         new_para.set(f"{W14}textId", "77777777")
+        if align and align != "left":
+            ppr = etree.SubElement(new_para, f"{W}pPr")
+            jc = etree.SubElement(ppr, f"{W}jc")
+            jc.set(f"{W}val", align)
         run = etree.SubElement(new_para, f"{W}r")
         drawing = etree.SubElement(run, f"{W}drawing")
         inline = etree.SubElement(drawing, f"{WP}inline")

@@ -39,6 +39,7 @@ from .formatting import FormattingMixin
 from .headers_footers import HeadersFootersMixin
 from .hyperlinks import HyperlinksMixin
 from .images import ImagesMixin
+from .layout import LayoutMixin
 from .lists import ListsMixin
 from .litigation import LitigationMixin
 from .markdown_export import MarkdownExportMixin
@@ -95,6 +96,7 @@ class DocxDocument(
     ReferencesMixin,
     ProtectionMixin,
     MergeMixin,
+    LayoutMixin,
     MetadataMixin,
     CompareMixin,
     PiiMixin,
