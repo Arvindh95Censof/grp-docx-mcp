@@ -689,8 +689,17 @@ def insert_image(
     align sets the image paragraph alignment (left/center/right).
     """
     _, doc = _resolve(document_handle)
-    return _js(doc.insert_image(para_id, image_path, width_emu=width_emu, height_emu=height_emu,
-                                width_cm=width_cm, height_cm=height_cm, align=align))
+    return _js(
+        doc.insert_image(
+            para_id,
+            image_path,
+            width_emu=width_emu,
+            height_emu=height_emu,
+            width_cm=width_cm,
+            height_cm=height_cm,
+            align=align,
+        )
+    )
 
 
 @mcp.tool()
@@ -3149,7 +3158,6 @@ def extract_template_structure(document_handle: str = "") -> str:
     (index, dimensions, cell content). Use to map a template before filling it."""
     _, doc = _resolve(document_handle)
     return _js(doc.extract_template_structure())
-
 
 
 # ── Entry point ─────────────────────────────────────────────────────────────

@@ -6,7 +6,7 @@ import copy
 
 from lxml import etree
 
-from .base import W, W14
+from .base import W14, W
 
 
 class LayoutMixin:
@@ -137,7 +137,6 @@ class LayoutMixin:
 
         return {"replacements": counts, "total": sum(counts.values())}
 
-
     @staticmethod
     def _border_info(el: etree._Element, tag: str) -> dict:
         b = el.find(tag)
@@ -149,20 +148,6 @@ class LayoutMixin:
             if b.get(f"{W}{k}")
         }
 
-    @staticmethod
-    def _half_pt(el: etree._Element, tag: str) -> int | None:
-        e = el.find(tag)
-        if e is not None:
-            v = e.get(f"{W}val", "")
-            if v.isdigit():
-                return int(v) // 2
-        return None
-
-    @staticmethod
-    def _dxa(el: etree._Element, tag: str, attr: str = "w") -> str:
-        e = el.find(tag)
-        return e.get(f"{W}{attr}", "") if e is not None else ""
-
     def _parse_rpr(self, rpr: etree._Element) -> dict:
         """Extract all character properties from a w:rPr element."""
         entry: dict = {}
@@ -171,10 +156,7 @@ class LayoutMixin:
         rfonts = rpr.find(f"{W}rFonts")
         if rfonts is not None:
             entry["font"] = (
-                rfonts.get(f"{W}ascii")
-                or rfonts.get(f"{W}hAnsi")
-                or rfonts.get(f"{W}cs")
-                or ""
+                rfonts.get(f"{W}ascii") or rfonts.get(f"{W}hAnsi") or rfonts.get(f"{W}cs") or ""
             )
             if rfonts.get(f"{W}cs"):
                 entry["font_cs"] = rfonts.get(f"{W}cs")
@@ -338,9 +320,18 @@ class LayoutMixin:
                         style_map["page"]["orientation"] = pg_sz.get(f"{W}orient", "portrait")
                     pg_mar = sect_pr.find(f"{W}pgMar")
                     if pg_mar is not None:
+                        margin_keys = (
+                            "top",
+                            "bottom",
+                            "left",
+                            "right",
+                            "header",
+                            "footer",
+                            "gutter",
+                        )
                         style_map["page"]["margins"] = {
                             k: pg_mar.get(f"{W}{k}", "")
-                            for k in ("top", "bottom", "left", "right", "header", "footer", "gutter")
+                            for k in margin_keys
                             if pg_mar.get(f"{W}{k}")
                         }
                     cols = sect_pr.find(f"{W}cols")
@@ -403,8 +394,15 @@ class LayoutMixin:
                     if tbl_look is not None:
                         tinfo["tbl_look"] = {
                             k: tbl_look.get(f"{W}{k}", "")
-                            for k in ("val", "firstRow", "lastRow", "firstColumn", "lastColumn",
-                                      "noHBand", "noVBand")
+                            for k in (
+                                "val",
+                                "firstRow",
+                                "lastRow",
+                                "firstColumn",
+                                "lastColumn",
+                                "noHBand",
+                                "noVBand",
+                            )
                             if tbl_look.get(f"{W}{k}")
                         }
 
@@ -432,8 +430,16 @@ class LayoutMixin:
                             tc_bdr = tc_pr.find(f"{W}tcBorders")
                             if tc_bdr is not None:
                                 cborders = {}
-                                for side in ("top", "bottom", "left", "right",
-                                             "insideH", "insideV", "tl2br", "tr2bl"):
+                                for side in (
+                                    "top",
+                                    "bottom",
+                                    "left",
+                                    "right",
+                                    "insideH",
+                                    "insideV",
+                                    "tl2br",
+                                    "tr2bl",
+                                ):
                                     b = self._border_info(tc_bdr, f"{W}{side}")
                                     if b:
                                         cborders[side] = b
