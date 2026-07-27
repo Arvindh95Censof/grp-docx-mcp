@@ -495,8 +495,7 @@ class TestExtractStyleMap:
             (
                 s
                 for s in styles.findall(f"{W}style")
-                if s.find(f"{W}name") is not None
-                and s.find(f"{W}name").get(f"{W}val") == "Normal"
+                if s.find(f"{W}name") is not None and s.find(f"{W}name").get(f"{W}val") == "Normal"
             ),
             None,
         )
